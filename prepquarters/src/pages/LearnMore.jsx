@@ -1,192 +1,104 @@
+import { useNavigate } from "react-router-dom";
+import {
+  ArrowRight,
+  ShieldCheck,
+  Cpu,
+  TrendingUp,
+  Bot,
+  Database,
+  Lock,
+  Layers,
+  Zap,
+} from "lucide-react";
+
 function LearnMore() {
+  const navigate = useNavigate();
+
   return (
-    <main className="learn-more-page">
+    <main className="prepquarters-home bg-grid-cyber" style={{ paddingBottom: "100px" }}>
+      <section className="features-section" style={{ paddingTop: "70px", maxWidth: "1080px" }}>
+        {/* Header */}
+        <div className="section-heading">
+          <p>SYSTEM ARCHITECTURE</p>
+          <h2>Engineering & Security Design</h2>
+          <span>
+            How PrepQuarters combines server-side NVIDIA NIM reasoning with deterministic telemetry
+            and absolute user data privacy.
+          </span>
+        </div>
 
-      {/* Hero */}
-      <section className="learn-hero">
-        <p className="section-label">ABOUT PREPQUARTERS</p>
+        {/* Architecture Grid */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "28px" }}>
+          {/* Pillar 1 */}
+          <article className="feature-card" style={{ padding: "36px" }}>
+            <div className="feature-top-row">
+              <div className="feature-icon">
+                <Cpu size={24} aria-hidden="true" />
+              </div>
+              <span className="luminous-badge cyan">01 // INFERENCE PIPELINE</span>
+            </div>
+            <h3 style={{ fontSize: "22px", marginBottom: "12px" }}>
+              Server-Side NVIDIA NIM Orchestration
+            </h3>
+            <p style={{ fontSize: "15px", lineHeight: "1.7", color: "var(--text-secondary)" }}>
+              All LLM inference executes strictly server-side through high-throughput NVIDIA NIM API
+              endpoints powered by state-of-the-art models like Llama 3.3 70B. Prompt templates
+              strictly enforce structured JSON responses with explicit rubrics, ensuring objective
+              evaluation without conversational hallucination or unnecessary praise.
+            </p>
+          </article>
 
-        <h1>
-          Prepare with clarity.
-          <br />
-          Perform with confidence.
-        </h1>
+          {/* Pillar 2 */}
+          <article className="feature-card" style={{ padding: "36px" }}>
+            <div className="feature-top-row">
+              <div className="feature-icon">
+                <Lock size={24} aria-hidden="true" />
+              </div>
+              <span className="luminous-badge emerald">02 // PRIVACY & ZERO DATA LEAKAGE</span>
+            </div>
+            <h3 style={{ fontSize: "22px", marginBottom: "12px" }}>
+              Strict Data Isolation & Secret Safeguards
+            </h3>
+            <p style={{ fontSize: "15px", lineHeight: "1.7", color: "var(--text-secondary)" }}>
+              Client browsers never receive API keys or sensitive credentials. All database access
+              enforces strict candidate user isolation (users can only access their own sessions).
+              Endpoints are fortified with in-memory rate limiting, input sanitization, and security
+              headers.
+            </p>
+          </article>
 
-        <p className="hero-description">
-          PrepQuarters combines realistic interview practice, guided
-          preparation, and AI-assisted insights in one focused experience
-          built to help you prepare more effectively.
-        </p>
-      </section>
+          {/* Pillar 3 */}
+          <article className="feature-card" style={{ padding: "36px" }}>
+            <div className="feature-top-row">
+              <div className="feature-icon">
+                <Database size={24} aria-hidden="true" />
+              </div>
+              <span className="luminous-badge violet">03 // DETERMINISTIC TELEMETRY</span>
+            </div>
+            <h3 style={{ fontSize: "22px", marginBottom: "12px" }}>
+              Deterministic Hybrid Engine
+            </h3>
+            <p style={{ fontSize: "15px", lineHeight: "1.7", color: "var(--text-secondary)" }}>
+              Deterministic metrics (timers, question counts, aggregate averages, score bounds) are
+              calculated reliably in application code rather than outsourced to LLMs. This hybrid
+              architecture guarantees consistent session state, zero latency drift, and 100%
+              reproducible scorecards.
+            </p>
+          </article>
+        </div>
 
-
-      {/* Our Approach */}
-      <section className="learn-section">
-        <div className="section-number">01</div>
-
-        <div className="section-content">
-          <p className="section-label">OUR APPROACH</p>
-
-          <h2>Make every practice session count.</h2>
-
-          <p>
-            Instead of simply answering question after question, PrepQuarters
-            helps you understand what you are practicing, where you can
-            improve, and what to work on next.
-          </p>
+        {/* CTA */}
+        <div style={{ marginTop: "60px", textAlign: "center" }}>
+          <button
+            type="button"
+            className="hero-primary-btn"
+            onClick={() => navigate("/login")}
+          >
+            <span>Enter Candidate Cockpit</span>
+            <ArrowRight size={16} aria-hidden="true" />
+          </button>
         </div>
       </section>
-
-
-      {/* How It Works */}
-      <section className="learn-section experience-section">
-        <div className="section-number">02</div>
-
-        <div className="section-content">
-          <p className="section-label">HOW IT WORKS</p>
-
-          <h2>A simple path from practice to progress.</h2>
-
-          <div className="experience-grid">
-
-            <article className="learn-card">
-              <span>01</span>
-              <h3>Set Your Goal</h3>
-              <p>
-                Pick an interview category, topic, and difficulty that fits
-                what you want to practice.
-              </p>
-            </article>
-
-            <article className="learn-card">
-              <span>02</span>
-              <h3>Take the Challenge</h3>
-              <p>
-                Answer realistic questions designed to simulate an interview
-                environment.
-              </p>
-            </article>
-
-            <article className="learn-card">
-              <span>03</span>
-              <h3>Understand Your Results</h3>
-              <p>
-                Review feedback and identify the parts of your responses that
-                deserve more attention.
-              </p>
-            </article>
-
-            <article className="learn-card">
-              <span>04</span>
-              <h3>Keep Improving</h3>
-              <p>
-                Return to practice, build consistency, and track your
-                development over time.
-              </p>
-            </article>
-
-          </div>
-        </div>
-      </section>
-
-
-      {/* Why PrepQuarters */}
-      <section className="learn-section">
-        <div className="section-number">03</div>
-
-        <div className="section-content">
-          <p className="section-label">WHY PREPQUARTERS</p>
-
-          <h2>More than a question bank.</h2>
-
-          <div className="why-grid">
-
-            <article className="learn-card">
-              <h3>Targeted Practice</h3>
-              <p>
-                Focus your sessions around the skills, topics, and interview
-                types you actually want to improve.
-              </p>
-            </article>
-
-            <article className="learn-card">
-              <h3>AI-Assisted Insights</h3>
-              <p>
-                Get useful feedback that can help you think about your
-                responses from a different perspective.
-              </p>
-            </article>
-
-            <article className="learn-card">
-              <h3>Visible Progress</h3>
-              <p>
-                Keep an eye on your practice activity and discover areas where
-                additional preparation could help.
-              </p>
-            </article>
-
-            <article className="learn-card">
-              <h3>Your Preparation, Your Pace</h3>
-              <p>
-                Practice when you are ready and adjust your preparation as
-                your goals develop.
-              </p>
-            </article>
-
-          </div>
-        </div>
-      </section>
-
-
-      {/* Technology */}
-      <section className="learn-section technology-section">
-        <div className="section-number">04</div>
-
-        <div className="section-content">
-          <p className="section-label">THE TECHNOLOGY</p>
-
-          <h2>Technology that supports the learner.</h2>
-
-          <p>
-            PrepQuarters is designed around AI-assisted practice rather than
-            replacing the learner. The goal is to provide useful guidance,
-            structured practice, and insights while keeping you in control of
-            your preparation.
-          </p>
-        </div>
-      </section>
-
-
-      {/* Mission */}
-      <section className="mission-section">
-        <p className="section-label">OUR MISSION</p>
-
-        <h2>
-          Turn interview anxiety
-          <br />
-          into preparation.
-        </h2>
-
-        <p>
-          We believe preparation becomes more manageable when you have a clear
-          place to practice, reflect, and try again. PrepQuarters aims to make
-          that process more organized, approachable, and useful.
-        </p>
-      </section>
-
-
-      {/* Final CTA */}
-     <section className="learn-cta">
-  <p className="section-label">YOUR NEXT STEP</p>
-
-  <h2>Ready to put your preparation to work?</h2>
-
-  <p>
-    Build your confidence through focused practice,
-    meaningful feedback, and consistent preparation.
-  </p>
-</section>
-
     </main>
   );
 }

@@ -2,27 +2,46 @@ const express = require("express");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
+const { createRateLimiter, isValidEmail, sanitizeInput } = require("../middleware/securityMiddleware");
 
 const router = express.Router();
 
-/* =========================
-   SIGN UP
-========================= */
+// Rate limiter for auth endpoints: max 20 requests per 15 minutes per IP
+const authLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  message: "Too many authentication attempts. Please wait a few minutes before trying again.",
+});
 
-router.post("/signup", async (req, res) => {
+/* =========================================
+   SIGN UP
+========================================= */
+router.post("/signup", authLimiter, async (req, res) => {
   try {
-    const {
-      name,
-      email,
-      password,
-      confirmPassword,
-      role,
-    } = req.body;
+    const name = sanitizeInput(req.body.name);
+    const email = sanitizeInput(req.body.email);
+    const password = req.body.password;
+    const confirmPassword = req.body.confirmPassword;
+    const role = req.body.role || "candidate";
 
     if (!name || !email || !password || !confirmPassword) {
       return res.status(400).json({
         success: false,
         message: "Please fill in all required fields.",
+      });
+    }
+
+    if (!isValidEmail(email)) {
+      return res.status(400).json({
+        success: false,
+        message: "Please provide a valid email address.",
+      });
+    }
+
+    if (password.length < 8) {
+      return res.status(400).json({
+        success: false,
+        message: "Password must be at least 8 characters long.",
       });
     }
 
@@ -40,7 +59,7 @@ router.post("/signup", async (req, res) => {
     if (existingUser) {
       return res.status(409).json({
         success: false,
-        message: "An account with this email already exists.",
+        message: "An account with this email address already exists.",
       });
     }
 
@@ -50,7 +69,7 @@ router.post("/signup", async (req, res) => {
       name,
       email: email.toLowerCase(),
       password: hashedPassword,
-      role: role || "candidate",
+      role: role === "interviewer" ? "interviewer" : "candidate",
     });
 
     const token = jwt.sign(
@@ -58,8 +77,9 @@ router.post("/signup", async (req, res) => {
         userId: user._id,
         email: user.email,
         role: user.role,
+        name: user.name,
       },
-      process.env.JWT_SECRET,
+      process.env.JWT_SECRET || "default_prepquarters_secret",
       {
         expiresIn: "7d",
       }
@@ -74,26 +94,27 @@ router.post("/signup", async (req, res) => {
         name: user.name,
         email: user.email,
         role: user.role,
+        targetRole: user.targetRole,
+        targetDomain: user.targetDomain,
+        targetDifficulty: user.targetDifficulty,
       },
     });
   } catch (error) {
-    console.error("Signup error:", error);
-
+    console.error("Signup processing error:", error.message);
     res.status(500).json({
       success: false,
-      message: "Something went wrong while creating your account.",
+      message: "An unexpected error occurred while creating your account. Please try again.",
     });
   }
 });
 
-
-/* =========================
+/* =========================================
    LOGIN
-========================= */
-
-router.post("/login", async (req, res) => {
+========================================= */
+router.post("/login", authLimiter, async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const email = sanitizeInput(req.body.email);
+    const password = req.body.password;
 
     if (!email || !password) {
       return res.status(400).json({
@@ -102,12 +123,16 @@ router.post("/login", async (req, res) => {
       });
     }
 
+    if (!isValidEmail(email)) {
+      return res.status(400).json({
+        success: false,
+        message: "Please enter a valid email address.",
+      });
+    }
+
     const user = await User.findOne({
       email: email.toLowerCase(),
     });
-console.log("LOGIN DEBUG - email:", email);
-console.log("LOGIN DEBUG - user found:", !!user);
-   
 
     if (!user) {
       return res.status(401).json({
@@ -116,14 +141,7 @@ console.log("LOGIN DEBUG - user found:", !!user);
       });
     }
 
-    const passwordMatches = await bcrypt.compare(
-      password,
-      user.password
-    );
-    console.log(
-  "LOGIN DEBUG - password matches:",
-  passwordMatches
-);
+    const passwordMatches = await bcrypt.compare(password, user.password);
 
     if (!passwordMatches) {
       return res.status(401).json({
@@ -137,8 +155,9 @@ console.log("LOGIN DEBUG - user found:", !!user);
         userId: user._id,
         email: user.email,
         role: user.role,
+        name: user.name,
       },
-      process.env.JWT_SECRET,
+      process.env.JWT_SECRET || "default_prepquarters_secret",
       {
         expiresIn: "7d",
       }
@@ -153,14 +172,17 @@ console.log("LOGIN DEBUG - user found:", !!user);
         name: user.name,
         email: user.email,
         role: user.role,
+        targetRole: user.targetRole,
+        targetDomain: user.targetDomain,
+        targetDifficulty: user.targetDifficulty,
+        stats: user.stats,
       },
     });
   } catch (error) {
-    console.error("Login error:", error);
-
+    console.error("Login processing error:", error.message);
     res.status(500).json({
       success: false,
-      message: "Something went wrong while logging in.",
+      message: "An unexpected error occurred during login. Please try again.",
     });
   }
 });

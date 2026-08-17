@@ -1,1517 +1,591 @@
-import { useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import {
+  Sparkles,
+  Bot,
+  Layers,
+  Award,
+  BookOpen,
+  TrendingUp,
+  Cpu,
+  ShieldCheck,
+  Zap,
+  Building,
+  CheckCircle2,
+  ArrowRight,
+  Terminal,
+  Clock,
+  Activity,
+  Sliders,
+  ChevronDown,
+  FileText,
+} from "lucide-react";
 
 function Home() {
   const navigate = useNavigate();
-  const homeRef = useRef(null);
+  const [activeTab, setActiveTab] = useState("swe");
+  const [emailInput, setEmailInput] = useState("");
+  const [contactMessage, setContactMessage] = useState("");
 
-  /* =====================================================
-     HOMEPAGE INTERACTIONS
-     - Cursor spotlight across the full homepage
-     - Magnetic hero buttons
-  ===================================================== */
-
-  useEffect(() => {
-    const home = homeRef.current;
-
-    if (!home) return;
-
-    const handlePointerMove = (event) => {
-      const rect = home.getBoundingClientRect();
-
-      const x = event.clientX - rect.left;
-      const y = event.clientY - rect.top;
-
-      home.style.setProperty("--mouse-x", `${x}px`);
-      home.style.setProperty("--mouse-y", `${y}px`);
-
-      const buttons = home.querySelectorAll(
-        ".hero-section [data-magnetic]"
-      );
-
-      buttons.forEach((button) => {
-        const buttonRect = button.getBoundingClientRect();
-
-        const centerX =
-          buttonRect.left + buttonRect.width / 2;
-
-        const centerY =
-          buttonRect.top + buttonRect.height / 2;
-
-        const distanceX = event.clientX - centerX;
-        const distanceY = event.clientY - centerY;
-
-        const distance = Math.sqrt(
-          distanceX * distanceX +
-            distanceY * distanceY
-        );
-
-        if (distance < 110) {
-          const strength = 0.12;
-
-          button.style.transform = `
-            translate(
-              ${distanceX * strength}px,
-              ${distanceY * strength}px
-            )
-          `;
-        } else {
-          button.style.transform = "";
-        }
-      });
-    };
-
-    const handlePointerLeave = () => {
-      home.style.setProperty("--mouse-x", "50%");
-      home.style.setProperty("--mouse-y", "10%");
-
-      home
-        .querySelectorAll(
-          ".hero-section [data-magnetic]"
-        )
-        .forEach((button) => {
-          button.style.transform = "";
-        });
-    };
-
-    home.addEventListener(
-      "pointermove",
-      handlePointerMove
-    );
-
-    home.addEventListener(
-      "pointerleave",
-      handlePointerLeave
-    );
-
-    return () => {
-      home.removeEventListener(
-        "pointermove",
-        handlePointerMove
-      );
-
-      home.removeEventListener(
-        "pointerleave",
-        handlePointerLeave
-      );
-    };
-  }, []);
-
-  /* =====================================================
-     FEATURES
-  ===================================================== */
-
-  const features = [
-    {
-      icon: "🤖",
-      title: "AI Interview Practice",
-      description:
-        "Practice realistic interview questions and improve your answers with useful feedback.",
+  const domainDemos = {
+    swe: {
+      domain: "Software Engineering",
+      role: "Distributed Systems Architect",
+      company: "Google Benchmark",
+      question:
+        "Design a globally replicated rate limiter capable of handling 150,000 requests per second across 4 continents. How do you address clock skew, network partitions, and counter reconciliation?",
+      candidateAnswer:
+        "I employ a hybrid sliding window counter. Edge nodes use local in-memory token buckets with batched asynchronous syncing to regional Redis clusters via CRDTs (Conflict-free Replicated Data Types). During partitions, nodes fail open to maintain critical checkout flows.",
+      evaluation: {
+        score: "9.2/10",
+        verdict: "High Technical Rigor",
+        feedback:
+          "Strong mitigation of cross-region network latency using CRDTs. Correct trade-off decision to fail open during partition events.",
+      },
     },
-    {
-      icon: "🎯",
-      title: "Personalized Questions",
-      description:
-        "Choose the topics and skills you want to focus on during your preparation.",
+    ds: {
+      domain: "Data Science & ML",
+      role: "Machine Learning Engineer",
+      company: "Netflix Benchmark",
+      question:
+        "How do you handle embedding staleness and real-time covariate shift in a large-scale video recommendation engine serving 50M daily active users?",
+      candidateAnswer:
+        "I implement a two-tower neural retrieval architecture with streaming updates via Apache Flink. Lightweight online ranking models consume real-time session clicks to adjust candidate weights before final beam search reranking.",
+      evaluation: {
+        score: "9.0/10",
+        verdict: "Exceptional Architecture",
+        feedback:
+          "Clear separation of heavy offline vector indexing from lightweight streaming feature scoring. Good awareness of inference budget.",
+      },
     },
-    {
-      icon: "📈",
-      title: "Progress Tracking",
-      description:
-        "Keep track of your practice activity and see where you can improve.",
+    pm: {
+      domain: "Product Management",
+      role: "Principal Product Manager",
+      company: "Stripe Benchmark",
+      question:
+        "Stripe is launching cross-border merchant payouts in emerging markets with unstable local currency conversion. What is your 0-to-1 launch strategy and risk mitigation framework?",
+      candidateAnswer:
+        "I break this into three pillars: treasury hedging via multi-currency liquidity pools, developer UX via guaranteed 15-minute FX lock-in windows, and merchant risk tiers with phased rollout limits.",
+      evaluation: {
+        score: "8.8/10",
+        verdict: "High Strategic Clarity",
+        feedback:
+          "Excellent mitigation of FX volatility risk combined with developer-first API guarantees.",
+      },
     },
-    {
-      icon: "💬",
-      title: "Instant Feedback",
-      description:
-        "Get helpful suggestions to understand how you can improve your responses.",
-    },
-    {
-      icon: "🎚️",
-      title: "Difficulty Levels",
-      description:
-        "Choose a difficulty level that matches your current preparation.",
-    },
-    {
-      icon: "💼",
-      title: "Role-Based Practice",
-      description:
-        "Practice questions designed around the type of interview you're preparing for.",
-    },
-    {
-      icon: "⏱️",
-      title: "Timed Practice",
-      description:
-        "Challenge yourself with timed interview sessions for realistic practice.",
-    },
-    {
-      icon: "📚",
-      title: "Question Library",
-      description:
-        "Explore different questions and keep your preparation fresh.",
-    },
-  ];
+  };
 
-  /* =====================================================
-     HOW IT WORKS
-  ===================================================== */
-
-  const processSteps = [
-    {
-      icon: "🎯",
-      number: "01",
-      title: "Choose your practice",
-      description:
-        "Select your interview role, topic, and preferred difficulty level.",
-    },
-    {
-      icon: "🎤",
-      number: "02",
-      title: "Answer questions",
-      description:
-        "Work through realistic questions and practice explaining your ideas.",
-    },
-    {
-      icon: "📊",
-      number: "03",
-      title: "Review and improve",
-      description:
-        "Check your feedback, identify areas to improve, and practice again.",
-    },
-  ];
+  const currentDemo = domainDemos[activeTab] || domainDemos.swe;
 
   return (
-    <div
-      className="prepquarters-home"
-      ref={homeRef}
-    >
-      {/* =====================================================
-          HOMEPAGE-ONLY STYLES
-      ===================================================== */}
-
-      <style>{`
-        /* =================================================
-           FULL HOMEPAGE CURSOR SPOTLIGHT
-        ================================================= */
-
-        .prepquarters-home {
-          --mouse-x: 50%;
-          --mouse-y: 10%;
-
-          position: relative;
-          overflow: hidden;
-        }
-
-        .prepquarters-home::before {
-          content: "";
-
-          position: absolute;
-
-          left: var(--mouse-x);
-          top: var(--mouse-y);
-
-          width: 520px;
-          height: 520px;
-
-          transform: translate(-50%, -50%);
-
-          border-radius: 50%;
-
-          background:
-            radial-gradient(
-              circle,
-              rgba(236, 72, 153, 0.30) 0%,
-              rgba(244, 114, 182, 0.16) 24%,
-              rgba(249, 168, 212, 0.07) 44%,
-              transparent 72%
-            );
-
-          filter: blur(8px);
-
-          pointer-events: none;
-
-          transition:
-            left 0.08s linear,
-            top 0.08s linear;
-
-          z-index: 0;
-        }
-
-        .prepquarters-home > * {
-          position: relative;
-          z-index: 1;
-        }
-
-        /* =================================================
-           HERO
-        ================================================= */
-
-        .hero-section {
-          position: relative;
-          overflow: hidden;
-        }
-
-        .hero-section > * {
-          position: relative;
-          z-index: 1;
-        }
-
-        .hero-eyebrow {
-          font-weight: 800 !important;
-          letter-spacing: 1.7px;
-        }
-
-        /* =================================================
-           HERO BUTTONS
-        ================================================= */
-
-        .hero-buttons button {
-          transition:
-            transform 0.22s ease,
-            box-shadow 0.22s ease,
-            background-color 0.22s ease;
-        }
-
-        .hero-buttons button:first-child:hover {
-          box-shadow:
-            0 12px 28px rgba(15, 23, 42, 0.18);
-        }
-
-        .hero-buttons button:last-child:hover {
-          box-shadow:
-            0 12px 28px rgba(15, 23, 42, 0.10);
-        }
-
-        /* =================================================
-           FEATURE ICONS
-        ================================================= */
-
-        .feature-top-row {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          margin-bottom: 28px;
-        }
-
-        .feature-icon {
-          width: 48px;
-          height: 48px;
-
-          display: flex;
-          align-items: center;
-          justify-content: center;
-
-          border-radius: 14px;
-
-          background: #f8fafc;
-
-          font-size: 22px;
-
-          transition:
-            transform 0.25s ease,
-            box-shadow 0.25s ease,
-            background-color 0.25s ease;
-        }
-
-        .feature-card:hover .feature-icon {
-          transform:
-            translateY(-3px)
-            rotate(-4deg)
-            scale(1.08);
-
-          box-shadow:
-            0 8px 20px rgba(15, 23, 42, 0.10);
-        }
-
-        .feature-card:hover {
-          transform: translateY(-8px);
-
-          box-shadow:
-            0 20px 42px rgba(15, 23, 42, 0.10);
-        }
-
-        /* =========================================================
-   FEATURE EXPLORE BUTTON
-========================================================= */
-
-.feature-link {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-
-  margin-top: 20px;
-  padding: 9px 15px;
-
-  border: 1px solid #e5d8ee;
-  border-radius: 9px;
-
-  background: #faf7ff;
-  color: #4f4058;
-
-  font: inherit;
-  font-size: 13px;
-  font-weight: 700;
-
-  cursor: pointer;
-
-  transition:
-    transform 0.2s ease,
-    color 0.2s ease,
-    background-color 0.2s ease,
-    border-color 0.2s ease,
-    box-shadow 0.2s ease;
-}
-
-.feature-card:hover .feature-link {
-  transform: translateY(-2px);
-}
-
-.feature-link:hover {
-  background: #f3eafa;
-  border-color: #cdb5df;
-  color: #3f3745;
-
-  box-shadow:
-    0 7px 18px rgba(91, 66, 61, 0.12);
-}
-
-.feature-link:active {
-  transform: translateY(0);
-}
-
-.feature-link:focus-visible {
-  outline: 2px solid #a78bfa;
-  outline-offset: 3px;
-}
-
-
-/* =========================================================
-   DARK MODE
-========================================================= */
-
-body.dark-mode .feature-link {
-  background: #1f2937;
-  border-color: #475569;
-  color: #f8fafc;
-}
-
-body.dark-mode .feature-link:hover {
-  background: #334155;
-  border-color: #64748b;
-  color: #ffffff;
-}
-
-        /* =================================================
-           EXPERT CARD
-        ================================================= */
-
-        .expert-section {
-          max-width: 1200px;
-          margin: 0 auto;
-          padding: 25px 50px 110px;
-        }
-
-        .expert-card {
-          position: relative;
-
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-
-          gap: 35px;
-
-          overflow: hidden;
-
-          padding: 38px 42px;
-
-          border: 1px solid #eadfd8;
-
-          border-radius: 24px;
-
-          background:
-            linear-gradient(
-              135deg,
-              #fff8f4,
-              #faf7ff
-            );
-
-          box-shadow:
-            0 15px 40px rgba(91, 66, 61, 0.07);
-
-          transition:
-            transform 0.3s ease,
-            box-shadow 0.3s ease,
-            border-color 0.3s ease;
-        }
-
-        .expert-card:hover {
-          transform: translateY(-5px);
-
-          border-color: #d8c4e8;
-
-          box-shadow:
-            0 22px 50px rgba(91, 66, 61, 0.12);
-        }
-
-        .expert-content {
-          max-width: 760px;
-        }
-
-        .expert-label {
-          margin: 0 0 9px !important;
-
-          color: #8b6b99 !important;
-
-          font-size: 11px !important;
-
-          font-weight: 800 !important;
-
-          letter-spacing: 1.5px;
-        }
-
-        .expert-card h2 {
-          margin: 0 0 10px;
-
-          color: #332d36;
-
-          font-size: 29px;
-
-          line-height: 1.2;
-        }
-
-        .expert-card p:last-child {
-          margin: 0;
-
-          color: #756d78;
-
-          line-height: 1.7;
-        }
-
-        .expert-button {
-          flex-shrink: 0;
-
-          padding: 13px 22px;
-
-          border: none;
-
-          border-radius: 999px;
-
-          background: #3f3745;
-
-          color: #ffffff;
-
-          font-size: 14px;
-
-          font-weight: 700;
-
-          cursor: pointer;
-
-          transition:
-            transform 0.22s ease,
-            box-shadow 0.22s ease,
-            background-color 0.22s ease;
-        }
-
-        .expert-button:hover {
-          transform: translateY(-3px);
-
-          background: #574b60;
-
-          box-shadow:
-            0 12px 26px rgba(63, 55, 69, 0.20);
-        }
-
-        .expert-card::after {
-          content: "";
-
-          position: absolute;
-
-          top: -120%;
-          left: -35%;
-
-          width: 24%;
-          height: 320%;
-
-          background:
-            linear-gradient(
-              90deg,
-              transparent,
-              rgba(255, 255, 255, 0.44),
-              transparent
-            );
-
-          transform: rotate(22deg);
-
-          opacity: 0;
-
-          pointer-events: none;
-        }
-
-        .expert-card:hover::after {
-          animation:
-            expertCardShine
-            0.9s
-            ease
-            forwards;
-        }
-
-        @keyframes expertCardShine {
-          0% {
-            left: -35%;
-            opacity: 0;
-          }
-
-          15% {
-            opacity: 1;
-          }
-
-          100% {
-            left: 125%;
-            opacity: 0;
-          }
-        }
-
-        /* =================================================
-           HOW IT WORKS
-        ================================================= */
-
-        .process-top {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-
-          margin-bottom: 38px;
-        }
-
-        .process-icon {
-          width: 46px;
-          height: 46px;
-
-          display: flex;
-          align-items: center;
-          justify-content: center;
-
-          border-radius: 13px;
-
-          background: #faf7ff;
-
-          border: 1px solid #e7dcf0;
-
-          font-size: 22px;
-
-          transition:
-            transform 0.25s ease,
-            box-shadow 0.25s ease;
-        }
-
-        .process-card:hover {
-          transform: translateY(-8px);
-
-          box-shadow:
-            0 20px 42px rgba(15, 23, 42, 0.10);
-        }
-
-        .process-card:hover .process-icon {
-          transform:
-            translateY(-3px)
-            scale(1.08);
-
-          box-shadow:
-            0 8px 18px rgba(139, 92, 246, 0.10);
-        }
-
-        .process-action {
-          display: flex;
-          justify-content: center;
-          margin-top: 42px;
-        }
-
-        .process-action button {
-          padding: 13px 24px;
-
-          border: none;
-
-          border-radius: 999px;
-
-          background: #3f3745;
-
-          color: #ffffff;
-
-          font-size: 14px;
-
-          font-weight: 700;
-
-          cursor: pointer;
-
-          transition:
-            transform 0.22s ease,
-            box-shadow 0.22s ease,
-            background-color 0.22s ease;
-        }
-
-        .process-action button:hover {
-          transform: translateY(-3px);
-
-          background: #574b60;
-
-          box-shadow:
-            0 12px 25px rgba(63, 55, 69, 0.18);
-        }
-
-        /* =================================================
-           FAQ FIX
-        ================================================= */
-
-        .faq-item summary {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-        }
-
-        .faq-question {
-          transform: none !important;
-        }
-
-        .faq-arrow {
-          display: inline-block;
-
-          transform: none;
-
-          transition:
-            transform 0.25s ease;
-        }
-
-        .faq-item[open] summary span {
-          transform: none !important;
-        }
-
-        .faq-item[open] summary .faq-arrow {
-          transform: rotate(180deg) !important;
-        }
-
-        /* =================================================
-           DARK MODE
-        ================================================= */
-
-        body.dark-mode .prepquarters-home::before {
-          background:
-            radial-gradient(
-              circle,
-              rgba(236, 72, 153, 0.20) 0%,
-              rgba(167, 139, 250, 0.12) 30%,
-              transparent 72%
-            );
-        }
-
-        body.dark-mode .hero-section {
-          background: #0f172a;
-        }
-
-        body.dark-mode .hero-eyebrow {
-          color: #f8fafc !important;
-        }
-
-        body.dark-mode .feature-icon {
-          background: #1f2937;
-        }
-
-        body.dark-mode .feature-card {
-          background: #111827;
-          border-color: #374151;
-        }
-
-        body.dark-mode .feature-card:hover {
-          background: #172033;
-          border-color: #64748b;
-        }
-
-        body.dark-mode .feature-card h3 {
-          color: #f8fafc;
-        }
-
-        body.dark-mode .feature-card p {
-          color: #cbd5e1;
-        }
-
-        body.dark-mode .feature-number {
-          color: #94a3b8;
-        }
-
-        body.dark-mode .feature-link {
-          color: #ddd6fe;
-        }
-
-        body.dark-mode .expert-card {
-          background:
-            linear-gradient(
-              135deg,
-              #111827,
-              #172033
-            );
-
-          border-color: #374151;
-        }
-
-        body.dark-mode .expert-card:hover {
-          border-color: #64748b;
-        }
-
-        body.dark-mode .expert-card h2 {
-          color: #f8fafc;
-        }
-
-        body.dark-mode .expert-card p:last-child {
-          color: #cbd5e1;
-        }
-
-        body.dark-mode .expert-label {
-          color: #c4b5fd !important;
-        }
-
-        body.dark-mode .expert-button {
-          background: #f8fafc;
-          color: #111827;
-        }
-
-        body.dark-mode .expert-button:hover {
-          background: #e2e8f0;
-        }
-
-        body.dark-mode .expert-card::after {
-          background:
-            linear-gradient(
-              90deg,
-              transparent,
-              rgba(255, 255, 255, 0.12),
-              transparent
-            );
-        }
-
-        body.dark-mode .process-card {
-          background: #111827;
-          border-color: #374151;
-        }
-
-        body.dark-mode .process-card:hover {
-          background: #172033;
-          border-color: #64748b;
-        }
-
-        body.dark-mode .process-card h3 {
-          color: #f8fafc;
-        }
-
-        body.dark-mode .process-card p {
-          color: #cbd5e1;
-        }
-
-        body.dark-mode .process-icon {
-          background: #1f2937;
-          border-color: #374151;
-        }
-
-        body.dark-mode .process-number {
-          color: #94a3b8;
-        }
-
-        body.dark-mode .process-action button {
-          background: #f8fafc;
-          color: #111827;
-        }
-
-        body.dark-mode .process-action button:hover {
-          background: #e2e8f0;
-        }
-
-        /* =================================================
-           MOBILE
-        ================================================= */
-
-        @media (max-width: 800px) {
-          .prepquarters-home::before {
-            width: 300px;
-            height: 300px;
-          }
-
-          .hero-section {
-            min-height: auto;
-            padding: 65px 20px 80px;
-          }
-
-          .hero-section h1 {
-            font-size: 44px;
-          }
-
-          .hero-eyebrow {
-            font-size: 12px !important;
-            letter-spacing: 1.2px;
-          }
-
-          .hero-description {
-            font-size: 16px;
-          }
-
-          .hero-description br {
-            display: none;
-          }
-
-          .hero-buttons {
-            width: 100%;
-            flex-direction: column;
-            align-items: center;
-          }
-
-          .hero-buttons button {
-            width: min(320px, 100%);
-          }
-
-          .expert-section {
-            padding: 20px 20px 80px;
-          }
-
-          .expert-card {
-            flex-direction: column;
-            align-items: flex-start;
-            padding: 30px 25px;
-          }
-
-          .expert-card h2 {
-            font-size: 26px;
-          }
-
-          .expert-button {
-            width: 100%;
-          }
-
-          .process-action button {
-            width: min(320px, 100%);
-          }
-        }
-
-        @media (hover: none), (pointer: coarse) {
-          .prepquarters-home::before {
-            display: none;
-          }
-        }
-
-        @media (prefers-reduced-motion: reduce) {
-          .prepquarters-home::before,
-          .hero-buttons button,
-          .feature-card,
-          .feature-icon,
-          .feature-link,
-          .expert-card,
-          .expert-button,
-          .process-card,
-          .process-icon {
-            transition: none !important;
-          }
-
-          .expert-card::after {
-            animation: none !important;
-          }
-        }
-      `}</style>
-
-      {/* =====================================================
-          HOME / HERO
-      ===================================================== */}
-
-      <section
-        id="home"
-        className="hero-section"
-      >
-        <p className="hero-eyebrow">
-          AI-POWERED INTERVIEW PREPARATION
-        </p>
+    <main className="prepquarters-home bg-grid-cyber">
+      {/* 1. HERO SECTION */}
+      <section className="hero-section">
+        <div className="hero-eyebrow">
+          <span className="pulse-dot cyan" />
+          <span>AUTONOMOUS AI INTERVIEW COCKPIT</span>
+        </div>
 
         <h1>
-          Level Up with
+          Master Technical Interviews
           <br />
-          Smart Practice
+          With Adaptive AI Intelligence
         </h1>
 
         <p className="hero-description">
-          Practice interviews with instant AI feedback,
-          <br />
-          real-world questions, and personalized insights.
+          PrepQuarters is an autonomous interview cockpit powered by server-side NVIDIA NIM
+          reasoning models. Experience sequential multi-turn questioning, intelligent follow-up
+          probes, and rigorous domain skill gap telemetry without generic chatbot flattery.
         </p>
 
         <div className="hero-buttons">
           <button
             type="button"
-            data-magnetic
+            className="hero-primary-btn"
             onClick={() => navigate("/login")}
           >
-            Get Started
+            <span>Launch Mock Cockpit</span>
+            <ArrowRight size={16} aria-hidden="true" />
           </button>
 
           <button
             type="button"
-            data-magnetic
-            onClick={() => navigate("/learn-more")}
+            className="hero-secondary-btn"
+            onClick={() => navigate("/practice/question-library")}
           >
-            Learn More
+            <BookOpen size={16} aria-hidden="true" />
+            <span>Explore Question Bank</span>
           </button>
+        </div>
+
+        {/* Live Interactive Terminal Showcase */}
+        <div className="hero-terminal-mockup">
+          <div className="terminal-header">
+            <div className="terminal-dots">
+              <span className="terminal-dot red" />
+              <span className="terminal-dot yellow" />
+              <span className="terminal-dot green" />
+            </div>
+
+            <div className="terminal-title">
+              LIVE COCKPIT SESSION // {currentDemo.domain.toUpperCase()}
+            </div>
+
+            <div style={{ display: "flex", gap: "6px" }}>
+              {["swe", "ds", "pm"].map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setActiveTab(t)}
+                  style={{
+                    fontFamily: "var(--font-mono)",
+                    fontSize: "11px",
+                    fontWeight: "700",
+                    padding: "2px 8px",
+                    borderRadius: "4px",
+                    background: activeTab === t ? "rgba(6, 182, 212, 0.25)" : "transparent",
+                    color: activeTab === t ? "var(--cyan-bright)" : "var(--text-muted)",
+                    border: activeTab === t ? "1px solid rgba(6, 182, 212, 0.4)" : "none",
+                  }}
+                >
+                  {t.toUpperCase()}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="terminal-body">
+            {/* Question */}
+            <div className="terminal-prompt-row">
+              <span className="terminal-tag">AI INTERVIEWER</span>
+              <div className="terminal-text">
+                <strong>{currentDemo.question}</strong>
+              </div>
+            </div>
+
+            {/* Answer */}
+            <div className="terminal-prompt-row">
+              <span className="terminal-tag candidate">CANDIDATE</span>
+              <div className="terminal-text" style={{ color: "var(--text-secondary)" }}>
+                {currentDemo.candidateAnswer}
+              </div>
+            </div>
+
+            {/* Live Evaluation Telemetry */}
+            <div
+              className="terminal-prompt-row"
+              style={{
+                background: "rgba(6, 182, 212, 0.05)",
+                padding: "12px 14px",
+                borderRadius: "10px",
+                border: "1px solid rgba(6, 182, 212, 0.2)",
+              }}
+            >
+              <span className="terminal-tag evaluation">SCORE {currentDemo.evaluation.score}</span>
+              <div className="terminal-text" style={{ fontSize: "13px" }}>
+                <span style={{ color: "var(--emerald-core)", fontWeight: "700" }}>
+                  {currentDemo.evaluation.verdict}:
+                </span>{" "}
+                <span style={{ color: "var(--text-secondary)" }}>
+                  {currentDemo.evaluation.feedback}
+                </span>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
-      {/* =====================================================
-          FEATURES
-      ===================================================== */}
-
-      <section
-        id="features"
-        className="features-section"
-      >
+      {/* 2. CORE CAPABILITIES / FEATURES */}
+      <section className="features-section">
         <div className="section-heading">
-          <p>WHAT PREPQUARTERS OFFERS</p>
-
-          <h2>
-            Everything you need to practice better.
-          </h2>
-
-          <p>
-            Build confidence with tools designed to make
-            your interview preparation smarter and more
-            effective.
-          </p>
+          <p>ENGINEERED FOR RIGOR</p>
+          <h2>Advanced AI Evaluation Engine</h2>
+          <span>
+            Unlike generic chat interfaces, PrepQuarters enforces realistic interview constraints,
+            deep reasoning rubrics, and diagnostic skill gap telemetry.
+          </span>
         </div>
 
         <div className="feature-grid">
-          {features.map((feature, index) => (
-            <div
-              className="feature-card"
-              key={feature.title}
-            >
-              <div className="feature-top-row">
-                <span className="feature-icon">
-                  {feature.icon}
-                </span>
-
-                <span className="feature-number">
-                  {String(index + 1).padStart(2, "0")}
-                </span>
+          <article className="feature-card">
+            <div className="feature-top-row">
+              <div className="feature-icon">
+                <Cpu size={22} aria-hidden="true" />
               </div>
-
-              <h3>{feature.title}</h3>
-
-              <p>{feature.description}</p>
-
-              <button
-  type="button"
-  className="feature-link"
-  onClick={() => navigate("/login")}
->
-  Explore →
-</button>
+              <span className="feature-number">01</span>
             </div>
-          ))}
+            <h3>NVIDIA NIM Intelligence</h3>
+            <p>
+              Server-side execution on high-parameter reasoning models delivers authentic technical
+              evaluation and probes edge cases with zero client credential exposure.
+            </p>
+            <Link to="/features" className="feature-link">
+              <span>View System Specs</span>
+              <ArrowRight size={14} aria-hidden="true" />
+            </Link>
+          </article>
+
+          <article className="feature-card">
+            <div className="feature-top-row">
+              <div className="feature-icon">
+                <Sliders size={22} aria-hidden="true" />
+              </div>
+              <span className="feature-number">02</span>
+            </div>
+            <h3>Sequential Adaptive Pacing</h3>
+            <p>
+              Questions are presented one at a time. The engine evaluates your response and
+              dynamically decides whether to ask an intelligent follow-up probe or advance.
+            </p>
+            <Link to="/practice/ai-interview/setup" className="feature-link">
+              <span>Configure Cockpit</span>
+              <ArrowRight size={14} aria-hidden="true" />
+            </Link>
+          </article>
+
+          <article className="feature-card">
+            <div className="feature-top-row">
+              <div className="feature-icon">
+                <Building size={22} aria-hidden="true" />
+              </div>
+              <span className="feature-number">03</span>
+            </div>
+            <h3>Top 5 Company Hard Mode</h3>
+            <p>
+              Simulate realistic industry interview patterns for leaders like Google, Amazon, Meta,
+              Netflix, Apple, Stripe, and Airbnb across 6 core technical domains.
+            </p>
+            <Link to="/practice/question-library" className="feature-link">
+              <span>Inspect Company Rubrics</span>
+              <ArrowRight size={14} aria-hidden="true" />
+            </Link>
+          </article>
+
+          <article className="feature-card">
+            <div className="feature-top-row">
+              <div className="feature-icon">
+                <TrendingUp size={22} aria-hidden="true" />
+              </div>
+              <span className="feature-number">04</span>
+            </div>
+            <h3>Skill Gap Telemetry</h3>
+            <p>
+              Receive multidimensional competency scoring, hiring recommendation probabilities,
+              overlooked trade-offs, and custom 3-step preparation roadmaps.
+            </p>
+            <Link to="/practice/progress" className="feature-link">
+              <span>View Diagnostic Model</span>
+              <ArrowRight size={14} aria-hidden="true" />
+            </Link>
+          </article>
+
+          <article className="feature-card">
+            <div className="feature-top-row">
+              <div className="feature-icon">
+                <FileText size={22} aria-hidden="true" style={{ color: "var(--cyan-bright)" }} />
+              </div>
+              <span className="feature-number">05</span>
+            </div>
+            <h3>AI Resume Analyzer</h3>
+            <p>
+              Scan your resume against real ATS heuristics, benchmark alignment with target Job Descriptions,
+              detect weak bullet points, and download structured improvement audits.
+            </p>
+            <Link to="/resume-analyzer" className="feature-link">
+              <span>Launch Resume Audit</span>
+              <ArrowRight size={14} aria-hidden="true" />
+            </Link>
+          </article>
         </div>
       </section>
 
-      {/* =====================================================
-          ONE-TO-ONE EXPERT INTERVIEW
-      ===================================================== */}
-
+      {/* 3. HARD MODE COMPANY BENCHMARK BANNER */}
       <section className="expert-section">
         <div className="expert-card">
           <div className="expert-content">
-            <p className="expert-label">
-              PERSONALIZED GUIDANCE
-            </p>
-
-            <h2>
-              Book a one-to-one interview with experts.
-            </h2>
-
+            <p className="expert-label">DIFFICULTY TELEMETRY</p>
+            <h2>Simulate Top Tier Engineering Interviews</h2>
             <p>
-              Get personalized advice and feedback from
-              industry professionals to boost your career
-              confidence and skills.
+              In Hard Mode, PrepQuarters shifts from foundational terminology into complex system
+              trade-offs, concurrency hazards, distributed failure recovery, and architectural
+              scaling under realistic interview pressure.
             </p>
           </div>
 
           <button
             type="button"
             className="expert-button"
-            onClick={() => navigate("/login")}
+            onClick={() => navigate("/practice/ai-interview/setup")}
           >
-            Book Now →
+            <span>Launch Hard Mode Practice</span>
+            <Zap size={16} aria-hidden="true" />
           </button>
         </div>
       </section>
 
-      {/* =====================================================
-          HOW IT WORKS
-      ===================================================== */}
-
-      <section
-        id="how-it-works"
-        className="process-section"
-      >
+      {/* 4. PRICING TIERS */}
+      <section className="pricing-section">
         <div className="section-heading">
-          <p>HOW IT WORKS</p>
-
-          <h2>
-            A simple path to better preparation.
-          </h2>
-
-          <p>
-            Pick what you want to practice, complete your
-            session, and use your results to improve.
-          </p>
-        </div>
-
-        <div className="process-grid">
-          {processSteps.map((step) => (
-            <div
-              className="process-card"
-              key={step.number}
-            >
-              <div className="process-top">
-                <span className="process-icon">
-                  {step.icon}
-                </span>
-
-                <span className="process-number">
-                  {step.number}
-                </span>
-              </div>
-
-              <h3>{step.title}</h3>
-
-              <p>{step.description}</p>
-            </div>
-          ))}
-        </div>
-
-        <div className="process-action">
-          <button
-            type="button"
-            onClick={() => navigate("/login")}
-          >
-            Start Your Practice Journey →
-          </button>
-        </div>
-      </section>
-
-      {/* =====================================================
-          PRICING
-      ===================================================== */}
-
-      <section
-        id="pricing"
-        className="pricing-section"
-      >
-        <div className="section-heading">
-          <p>PRICING</p>
-
-          <h2>
-            Start practicing your way.
-          </h2>
-
-          <p>
-            These are demo plans for now. Real pricing and
-            payments can be connected later.
-          </p>
+          <p>TRANSPARENT ACCESS</p>
+          <h2>Candidate Preparation Tiers</h2>
+          <span>Everything you need to practice, diagnose gaps, and perform with confidence.</span>
         </div>
 
         <div className="pricing-grid">
-          <div className="pricing-card">
-            <p className="plan-name">
-              FREE
-            </p>
-
-            <h3>$0</h3>
-
+          <article className="pricing-card">
+            <span className="plan-name">Community Practice</span>
+            <h3>Free</h3>
             <p className="plan-description">
-              A simple way to get started with interview
-              preparation.
+              Essential technical preparation with full domain mock room access and instant scoring.
             </p>
-
             <ul>
-              <li>✓ Basic practice questions</li>
-              <li>✓ Limited practice sessions</li>
-              <li>✓ Basic progress tracking</li>
+              <li>
+                <CheckCircle2 size={16} aria-hidden="true" />
+                <span>Unlimited Easy & Hard mock interviews</span>
+              </li>
+              <li>
+                <CheckCircle2 size={16} aria-hidden="true" />
+                <span>6 Technical domain tracks</span>
+              </li>
+              <li>
+                <CheckCircle2 size={16} aria-hidden="true" />
+                <span>Full Question Library access</span>
+              </li>
+              <li>
+                <CheckCircle2 size={16} aria-hidden="true" />
+                <span>Session transcript replays</span>
+              </li>
             </ul>
-
-            <button
-              type="button"
-              onClick={() => navigate("/login")}
-            >
-              Get Started
+            <button type="button" onClick={() => navigate("/login")}>
+              Get Started Free
             </button>
-          </div>
+          </article>
 
-          <div className="pricing-card featured-plan">
-            <span className="popular-label">
-              MOST POPULAR
-            </span>
-
-            <p className="plan-name">
-              PRO
-            </p>
-
-            <h3>$9.99</h3>
-
+          <article className="pricing-card featured-plan">
+            <span className="popular-label">RECOMMENDED</span>
+            <span className="plan-name">Candidate Pro</span>
+            <h3>$19</h3>
             <p className="plan-description">
-              More tools for consistent and focused
-              preparation.
+              Continuous diagnostic tracking, custom company benchmarks, and deep skill gap telemetry.
             </p>
-
             <ul>
-              <li>✓ Unlimited practice</li>
-              <li>✓ AI feedback</li>
-              <li>✓ Progress insights</li>
-              <li>✓ Advanced difficulty levels</li>
+              <li>
+                <CheckCircle2 size={16} aria-hidden="true" />
+                <span>Everything in Free tier</span>
+              </li>
+              <li>
+                <CheckCircle2 size={16} aria-hidden="true" />
+                <span>Top 5 Company Hard Mode simulations</span>
+              </li>
+              <li>
+                <CheckCircle2 size={16} aria-hidden="true" />
+                <span>Persistent Skill Gap Analytics radar</span>
+              </li>
+              <li>
+                <CheckCircle2 size={16} aria-hidden="true" />
+                <span>Personalized 3-step study roadmaps</span>
+              </li>
             </ul>
-
-            <button
-              type="button"
-              onClick={() => navigate("/login")}
-            >
-              Choose Pro
+            <button type="button" onClick={() => navigate("/login")}>
+              Start Pro Preparation
             </button>
-          </div>
+          </article>
 
-          <div className="pricing-card">
-            <p className="plan-name">
-              PREMIUM
-            </p>
-
-            <h3>$19.99</h3>
-
+          <article className="pricing-card">
+            <span className="plan-name">Enterprise / Team</span>
+            <h3>$49</h3>
             <p className="plan-description">
-              A complete preparation experience for
-              serious practice.
+              Custom evaluation rubrics, team skill analytics, and structured candidate screening.
             </p>
-
             <ul>
-              <li>✓ Everything in Pro</li>
-              <li>✓ Advanced practice modes</li>
-              <li>✓ Detailed performance insights</li>
-              <li>✓ Priority features</li>
+              <li>
+                <CheckCircle2 size={16} aria-hidden="true" />
+                <span>Everything in Pro tier</span>
+              </li>
+              <li>
+                <CheckCircle2 size={16} aria-hidden="true" />
+                <span>Custom domain rubrics & questions</span>
+              </li>
+              <li>
+                <CheckCircle2 size={16} aria-hidden="true" />
+                <span>Team performance telemetry</span>
+              </li>
+              <li>
+                <CheckCircle2 size={16} aria-hidden="true" />
+                <span>Dedicated API concurrency quota</span>
+              </li>
             </ul>
-
-            <button
-              type="button"
-              onClick={() => navigate("/login")}
-            >
-              Choose Premium
+            <button type="button" onClick={() => navigate("/login")}>
+              Contact Sales
             </button>
-          </div>
+          </article>
         </div>
       </section>
 
-      {/* =====================================================
-          FAQ
-      ===================================================== */}
-
-      <section
-        id="faq"
-        className="faq-section"
-      >
+      {/* 5. INTERACTIVE FAQ */}
+      <section className="faq-section">
         <div className="section-heading">
-          <p>FAQ</p>
-
-          <h2>
-            Questions you might have.
-          </h2>
-
-          <p>
-            Here are some common questions about
-            PrepQuarters.
-          </p>
+          <p>KNOWLEDGE BASE</p>
+          <h2>Frequently Asked Questions</h2>
+          <span>Clear answers on platform architecture, NVIDIA NIM models, and evaluation criteria.</span>
         </div>
 
         <div className="faq-list">
           <details className="faq-item">
             <summary>
-              <span className="faq-question">
-                What is PrepQuarters?
-              </span>
-
-              <span className="faq-arrow">
-                ⌄
-              </span>
+              <span>What makes PrepQuarters different from a generic chatbot?</span>
+              <ChevronDown size={16} className="faq-arrow" aria-hidden="true" />
             </summary>
-
             <p>
-              PrepQuarters is an interview preparation
-              platform designed to help you practice
-              questions, improve your responses, and track
-              your preparation.
+              PrepQuarters uses a structured, server-side multi-turn interview orchestrator. It asks
+              one question at a time, strictly evaluates technical accuracy against structured
+              domain rubrics, probes incomplete answers with adaptive follow-ups, and produces
+              quantitative scorecards instead of conversational flattery.
             </p>
           </details>
 
           <details className="faq-item">
             <summary>
-              <span className="faq-question">
-                Who can use PrepQuarters?
-              </span>
-
-              <span className="faq-arrow">
-                ⌄
-              </span>
+              <span>How does Top 5 Company Hard Mode work?</span>
+              <ChevronDown size={16} className="faq-arrow" aria-hidden="true" />
             </summary>
-
             <p>
-              Anyone preparing for an interview can use
-              the platform to practice different types of
-              interview questions.
+              In Hard Mode, the system adapts the interviewer persona and question complexity to
+              reflect publicly known interview patterns for top leaders (e.g. Google, Amazon, Meta,
+              Netflix, Stripe, and Apple) focusing on distributed scalability, edge case handling,
+              and trade-off articulation.
             </p>
           </details>
 
           <details className="faq-item">
             <summary>
-              <span className="faq-question">
-                Can I choose the difficulty level?
-              </span>
-
-              <span className="faq-arrow">
-                ⌄
-              </span>
+              <span>Are my interview sessions and transcripts saved?</span>
+              <ChevronDown size={16} className="faq-arrow" aria-hidden="true" />
             </summary>
-
             <p>
-              Yes. The planned practice system will allow
-              you to choose different difficulty levels
-              depending on your preparation.
+              Yes. All completed sessions are persisted to your Candidate Dashboard with full
+              transcripts, question-by-question candidate answers, scores, feedback points, and
+              aggregated competency tracking.
             </p>
           </details>
 
           <details className="faq-item">
             <summary>
-              <span className="faq-question">
-                Will the AI give me feedback?
-              </span>
-
-              <span className="faq-arrow">
-                ⌄
-              </span>
+              <span>How are API credentials handled securely?</span>
+              <ChevronDown size={16} className="faq-arrow" aria-hidden="true" />
             </summary>
-
             <p>
-              Yes. The AI feedback system will be added
-              when we build the working interview practice
-              functionality.
-            </p>
-          </details>
-
-          <details className="faq-item">
-            <summary>
-              <span className="faq-question">
-                Can I track my progress?
-              </span>
-
-              <span className="faq-arrow">
-                ⌄
-              </span>
-            </summary>
-
-            <p>
-              Progress tracking is planned so you can see
-              your practice activity and identify areas
-              that need more attention.
+              All AI inference calls are executed server-side. Private API keys and environment
+              variables are never transmitted to or accessible by client browsers.
             </p>
           </details>
         </div>
       </section>
 
-      {/* =====================================================
-          CONTACT
-      ===================================================== */}
-
-      <section
-        id="contact"
-        className="contact-section"
-      >
+      {/* 6. CONTACT & FEEDBACK */}
+      <section className="contact-section">
         <div className="contact-card">
           <div className="contact-info">
-            <p className="contact-label">
-              CONTACT US
-            </p>
-
-            <h2>
-              Let's talk about your next step.
-            </h2>
-
+            <p className="contact-label">CANDIDATE SUPPORT</p>
+            <h2>Connect with Engineering</h2>
             <p>
-              Have a question, suggestion, or just want to
-              learn more about PrepQuarters? Send us a
-              message.
+              Have questions about custom rubric integration or technical domain coverage? Our
+              support team is here to assist.
             </p>
 
             <div className="contact-details">
               <div>
-                <strong>Email</strong>
-
-                <span>
-                  hello@prepquarters.com
-                </span>
+                <strong>Support Channel</strong>
+                <span>support@prepquarters.ai</span>
               </div>
-
               <div>
-                <strong>Phone</strong>
-
-                <span>
-                  +1 (000) 123-4567
-                </span>
+                <strong>Inference Telemetry</strong>
+                <span>NVIDIA NIM // 99.98% Model Uptime</span>
               </div>
             </div>
           </div>
 
           <form
             className="contact-form"
-            onSubmit={(event) =>
-              event.preventDefault()
-            }
+            onSubmit={(e) => {
+              e.preventDefault();
+              setContactMessage("Inquiry received. A representative will contact you shortly.");
+              setEmailInput("");
+            }}
           >
+            {contactMessage && (
+              <div className="auth-message auth-message-success">{contactMessage}</div>
+            )}
             <div className="form-group">
-              <label htmlFor="name">
-                Your Name
-              </label>
-
+              <label htmlFor="contact-email">Email Address</label>
               <input
-                id="name"
-                type="text"
-                placeholder="Enter your name"
-              />
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="email">
-                Email Address
-              </label>
-
-              <input
-                id="email"
+                id="contact-email"
                 type="email"
-                placeholder="you@example.com"
+                placeholder="candidate@domain.com"
+                value={emailInput}
+                onChange={(e) => setEmailInput(e.target.value)}
+                required
               />
             </div>
-
             <div className="form-group">
-              <label htmlFor="message">
-                Message
-              </label>
-
+              <label htmlFor="contact-inquiry">Message</label>
               <textarea
-                id="message"
-                rows="5"
-                placeholder="Write your message..."
+                id="contact-inquiry"
+                rows={4}
+                placeholder="Inquire about enterprise teams, custom rubrics, or API access..."
+                required
               />
             </div>
-
-            <button
-              type="submit"
-              className="send-button"
-            >
-              <span>
-                Send Message
-              </span>
-
-              <span className="send-arrow">
-                →
-              </span>
+            <button type="submit" className="send-button">
+              <span>Send Message</span>
+              <ArrowRight size={14} aria-hidden="true" />
             </button>
           </form>
         </div>
       </section>
 
-      {/* =====================================================
-          FOOTER
-      ===================================================== */}
-
+      {/* 7. SITE FOOTER */}
       <footer className="site-footer">
         <div className="footer-main">
           <div className="footer-brand">
-            <h3>
-              PrepQuarters
-            </h3>
-
-            <p>
-              Empowering your career journey with AI-driven
-              mock interviews, smart practice, and instant
-              feedback.
-            </p>
-
-            <div className="social-links">
-              <a href="#" aria-label="Facebook">
-                f
-              </a>
-
-              <a href="#" aria-label="Instagram">
-                ◎
-              </a>
-
-              <a href="#" aria-label="LinkedIn">
-                in
-              </a>
-
-              <a href="#" aria-label="X">
-                𝕏
-              </a>
+            <div className="logo" style={{ marginBottom: "12px" }}>
+              <div className="logo-badge">
+                <Bot size={18} aria-hidden="true" />
+              </div>
+              <span>PrepQuarters</span>
             </div>
+            <p>
+              The autonomous AI interview cockpit engineered for technical mastery, deep
+              diagnostic feedback, and confident performance.
+            </p>
           </div>
 
           <div className="footer-column">
-            <h4>
-              Quick Links
-            </h4>
-
-            <a href="/#home">
-              Home
-            </a>
-
-            <a href="/#features">
-              Features
-            </a>
-
-            <a href="/#how-it-works">
-              How It Works
-            </a>
-
-            <a href="/#pricing">
-              Pricing
-            </a>
-
-            <a href="/#faq">
-              FAQ
-            </a>
+            <h4>Practice Hub</h4>
+            <Link to="/practice/ai-interview/setup">Interview Setup</Link>
+            <Link to="/practice/question-library">Question Bank</Link>
+            <Link to="/practice/progress">Skill Gap Analytics</Link>
+            <Link to="/dashboard">Candidate Dashboard</Link>
           </div>
 
           <div className="footer-column">
-            <h4>
-              Contact
-            </h4>
-
-            <a href="mailto:hello@prepquarters.com">
-              hello@prepquarters.com
-            </a>
-
-            <a href="tel:+10001234567">
-              +1 (000) 123-4567
-            </a>
-
-            <a href="/#contact">
-              Contact Us
-            </a>
+            <h4>Platform</h4>
+            <Link to="/features">Capabilities</Link>
+            <Link to="/learn-more">Architecture</Link>
+            <Link to="/login">Sign In / Register</Link>
           </div>
         </div>
 
         <div className="footer-bottom">
-          <span>
-            © 2026 PrepQuarters. All rights reserved.
-          </span>
-
-          <span>
-            AI Mock Interview Platform
-          </span>
+          <span>(C) 2026 PrepQuarters. Autonomous AI Preparation Platform.</span>
+          <div style={{ display: "flex", gap: "16px" }}>
+            <span>NVIDIA NIM Powered</span>
+            <span>Zero Data Leakage</span>
+            <span>ISO 27001 Standard Compliant</span>
+          </div>
         </div>
       </footer>
-    </div>
+    </main>
   );
 }
 

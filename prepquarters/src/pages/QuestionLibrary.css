@@ -1,0 +1,540 @@
+/* ==========================================================================
+   QuestionLibrary.css - Scoped styling for PrepQuarters Question Repository
+   ========================================================================== */
+
+.ql-page-container {
+  min-height: 100vh;
+  background-color: var(--bg-void, #050811);
+  color: var(--text-primary, #f1f5f9);
+  padding-top: 2rem;
+  padding-bottom: 5rem;
+}
+
+.ql-content-wrapper {
+  max-width: 1280px;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+@media (min-width: 640px) {
+  .ql-content-wrapper {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .ql-content-wrapper {
+    padding-left: 2rem;
+    padding-right: 2rem;
+  }
+}
+
+/* --- Hero Header --- */
+.ql-hero-section {
+  text-align: center;
+  margin-bottom: 2.5rem;
+}
+
+.ql-hero-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 1rem;
+  border-radius: 9999px;
+  background: rgba(6, 182, 212, 0.1);
+  border: 1px solid rgba(6, 182, 212, 0.25);
+  color: var(--cyan-bright, #22d3ee);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.ql-hero-title {
+  margin-top: 1rem;
+  font-size: 2rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  font-family: var(--font-heading, 'Space Grotesk', sans-serif);
+  color: #ffffff;
+}
+
+@media (min-width: 640px) {
+  .ql-hero-title {
+    font-size: 3rem;
+  }
+}
+
+.ql-hero-subtitle {
+  margin-top: 0.75rem;
+  max-width: 42rem;
+  margin-left: auto;
+  margin-right: auto;
+  font-size: 0.925rem;
+  color: var(--text-secondary, #94a3b8);
+  line-height: 1.6;
+}
+
+/* --- Filter & Control Deck --- */
+.ql-control-deck {
+  margin-bottom: 2rem;
+  border-radius: 1rem;
+  background: rgba(15, 23, 42, 0.65);
+  border: 1px solid rgba(30, 41, 59, 0.8);
+  padding: 1.25rem;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+@media (min-width: 768px) {
+  .ql-control-deck {
+    padding: 1.5rem;
+  }
+}
+
+.ql-search-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+  margin-bottom: 1.25rem;
+}
+
+@media (min-width: 768px) {
+  .ql-search-row {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+}
+
+.ql-search-input-wrap {
+  position: relative;
+  flex: 1;
+}
+
+.ql-search-icon {
+  position: absolute;
+  left: 0.875rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #64748b;
+  pointer-events: none;
+}
+
+.ql-search-input {
+  width: 100%;
+  border-radius: 0.75rem;
+  background: rgba(3, 7, 18, 0.85);
+  border: 1px solid rgba(51, 65, 85, 0.6);
+  padding: 0.65rem 1rem 0.65rem 2.5rem;
+  font-size: 0.875rem;
+  color: #f8fafc;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.ql-search-input:focus {
+  border-color: var(--cyan-bright, #06b6d4);
+  box-shadow: 0 0 0 1px var(--cyan-bright, #06b6d4);
+}
+
+.ql-search-input::placeholder {
+  color: #64748b;
+}
+
+.ql-bookmark-filter-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.65rem 1.15rem;
+  border-radius: 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: 1px solid rgba(51, 65, 85, 0.6);
+  background: rgba(3, 7, 18, 0.6);
+  color: #94a3b8;
+  white-space: nowrap;
+}
+
+.ql-bookmark-filter-btn:hover {
+  color: #f1f5f9;
+  border-color: #64748b;
+}
+
+.ql-bookmark-filter-btn.active {
+  background: rgba(245, 158, 11, 0.12);
+  border-color: rgba(245, 158, 11, 0.4);
+  color: #fbbf24;
+}
+
+/* --- Filter Dropdowns Grid --- */
+.ql-filters-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.875rem;
+}
+
+@media (min-width: 640px) {
+  .ql-filters-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .ql-filters-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.ql-filter-group label {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #94a3b8;
+  margin-bottom: 0.35rem;
+}
+
+.ql-select {
+  width: 100%;
+  border-radius: 0.75rem;
+  background: rgba(3, 7, 18, 0.85);
+  border: 1px solid rgba(51, 65, 85, 0.6);
+  padding: 0.55rem 0.75rem;
+  font-size: 0.8rem;
+  color: #f8fafc;
+  outline: none;
+  transition: border-color 0.2s;
+  cursor: pointer;
+}
+
+.ql-select:focus {
+  border-color: var(--cyan-bright, #06b6d4);
+}
+
+/* --- Status & Counter Bar --- */
+.ql-status-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+  padding-left: 0.25rem;
+  padding-right: 0.25rem;
+}
+
+.ql-results-count {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #94a3b8;
+}
+
+.ql-results-count strong {
+  color: #38bdf8;
+}
+
+.ql-reset-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--cyan-bright, #06b6d4);
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.ql-reset-btn:hover {
+  color: #67e8f9;
+  text-decoration: underline;
+}
+
+/* --- Questions Grid --- */
+.ql-cards-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.25rem;
+}
+
+@media (min-width: 768px) {
+  .ql-cards-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.ql-question-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  border-radius: 1rem;
+  background: rgba(15, 23, 42, 0.75);
+  border: 1px solid rgba(30, 41, 59, 0.9);
+  padding: 1.5rem;
+  transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
+}
+
+.ql-question-card:hover {
+  border-color: rgba(6, 182, 212, 0.4);
+  transform: translateY(-2px);
+  box-shadow: 0 10px 20px -3px rgba(6, 182, 212, 0.1);
+}
+
+.ql-card-top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+
+.ql-badges-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.ql-badge-difficulty {
+  padding: 0.15rem 0.6rem;
+  border-radius: 0.375rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.ql-badge-difficulty.easy {
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: #34d399;
+}
+
+.ql-badge-difficulty.medium {
+  background: rgba(6, 182, 212, 0.12);
+  border: 1px solid rgba(6, 182, 212, 0.3);
+  color: #38bdf8;
+}
+
+.ql-badge-difficulty.hard {
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #f87171;
+}
+
+.ql-badge-type {
+  padding: 0.15rem 0.5rem;
+  border-radius: 0.375rem;
+  background: #1e293b;
+  border: 1px solid #334155;
+  color: #cbd5e1;
+  font-size: 0.7rem;
+  font-weight: 500;
+}
+
+.ql-badge-company {
+  padding: 0.15rem 0.5rem;
+  border-radius: 0.375rem;
+  background: rgba(6, 182, 212, 0.08);
+  border: 1px solid rgba(6, 182, 212, 0.2);
+  color: #67e8f9;
+  font-size: 0.7rem;
+  font-weight: 500;
+}
+
+.ql-bookmark-action-btn {
+  background: none;
+  border: none;
+  padding: 0.35rem;
+  border-radius: 0.5rem;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.ql-bookmark-action-btn:hover {
+  background: #1e293b;
+  color: #e2e8f0;
+}
+
+.ql-bookmark-action-btn.bookmarked {
+  color: #f59e0b;
+  background: rgba(245, 158, 11, 0.15);
+}
+
+.ql-topic-path {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #94a3b8;
+  margin-bottom: 0.5rem;
+}
+
+.ql-topic-separator {
+  color: #475569;
+}
+
+.ql-subtopic {
+  color: #64748b;
+}
+
+.ql-question-title {
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.45;
+  color: #f8fafc;
+  margin-bottom: 0.75rem;
+}
+
+.ql-rubric-box {
+  margin-top: 1rem;
+  padding: 0.875rem;
+  border-radius: 0.75rem;
+  background: rgba(3, 7, 18, 0.7);
+  border: 1px solid rgba(30, 41, 59, 0.8);
+}
+
+.ql-rubric-header {
+  display: block;
+  font-size: 0.675rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #94a3b8;
+  margin-bottom: 0.5rem;
+}
+
+.ql-rubric-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.ql-rubric-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  color: #94a3b8;
+  line-height: 1.4;
+}
+
+.ql-rubric-icon {
+  color: #06b6d4;
+  margin-top: 0.15rem;
+  flex-shrink: 0;
+}
+
+.ql-card-footer {
+  margin-top: 1.25rem;
+  padding-top: 0.875rem;
+  border-top: 1px solid rgba(30, 41, 59, 0.7);
+}
+
+.ql-practice-launch-btn {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.65rem 1rem;
+  border-radius: 0.75rem;
+  background: rgba(6, 182, 212, 0.15);
+  border: 1px solid rgba(6, 182, 212, 0.35);
+  color: #22d3ee;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.ql-practice-launch-btn:hover {
+  background: #0891b2;
+  border-color: #06b6d4;
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(6, 182, 212, 0.25);
+}
+
+/* --- Pagination Deck --- */
+.ql-pagination-deck {
+  margin-top: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+}
+
+.ql-page-nav-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.55rem 0.875rem;
+  border-radius: 0.75rem;
+  background: #0f172a;
+  border: 1px solid #1e293b;
+  color: #cbd5e1;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.ql-page-nav-btn:hover:not(:disabled) {
+  border-color: rgba(6, 182, 212, 0.4);
+  color: #ffffff;
+}
+
+.ql-page-nav-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.ql-page-indicator {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #94a3b8;
+}
+
+.ql-page-indicator strong {
+  color: #38bdf8;
+}
+
+/* --- Empty / Loading States --- */
+.ql-empty-state {
+  text-align: center;
+  padding: 3rem 1.5rem;
+  border-radius: 1rem;
+  background: rgba(15, 23, 42, 0.4);
+  border: 1px solid #1e293b;
+}
+
+.ql-empty-icon {
+  margin-left: auto;
+  margin-right: auto;
+  margin-bottom: 0.75rem;
+  color: #475569;
+}
+
+.ql-empty-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #e2e8f0;
+}
+
+.ql-empty-desc {
+  margin-top: 0.25rem;
+  font-size: 0.8rem;
+  color: #64748b;
+}

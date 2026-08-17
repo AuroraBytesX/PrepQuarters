@@ -1,571 +1,535 @@
-/* =====================================================
-   INTERVIEW SETUP
-===================================================== */
+/* =========================================================
+   INTERVIEW SETUP / CALIBRATION COCKPIT STYLES
+   PrepQuarters Modular Configuration Engine
+   ========================================================= */
 
-.interview-setup-page {
-  min-height: 100vh;
-  padding: 80px 24px 100px;
-
-  background: #fffaf7;
-  color: #695f70;
-
-  box-sizing: border-box;
+.setup-page {
+  min-height: calc(100vh - 70px);
+  width: 100%;
+  padding: 40px 20px 100px;
 }
 
-.interview-setup-container {
-  width: 100%;
-  max-width: 900px;
+.setup-container {
+  max-width: 1200px;
   margin: 0 auto;
 }
 
-
-/* =====================================================
-   HERO
-===================================================== */
-
-.interview-setup-hero {
-  max-width: 850px;
-  margin: 0 auto 60px;
-
-  text-align: center;
-}
-
-.interview-setup-eyebrow {
-  margin: 0 0 16px;
-
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 1.6px;
-
-  color: #8b6b99;
-}
-
-.interview-setup-hero h1 {
-  margin: 0 0 20px;
-
-  font-size: 58px;
-  line-height: 1.05;
-  font-weight: 800;
-
-  color: #2b1f30;
-}
-
-.interview-setup-description {
-  max-width: 650px;
-  margin: 0 auto;
-
-  font-size: 17px;
-  line-height: 1.7;
-
-  color: #756d78;
-}
-
-
-/* =====================================================
-   SETUP GROUP
-===================================================== */
-
-.interview-setup-group {
-  width: 100%;
-  margin-bottom: 24px;
-  padding: 25px;
-
-  box-sizing: border-box;
-
-  border: 1px solid #eadfd8;
-  border-radius: 18px;
-
-  background: #ffffff;
-}
-
-
-/* =====================================================
-   GROUP HEADING
-===================================================== */
-
-.interview-setup-heading {
+/* Nav & Session Bar */
+.setup-nav-row {
   display: flex;
+  justify-content: space-between;
   align-items: center;
-
-  gap: 13px;
-  margin-bottom: 19px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 12px;
 }
 
-.interview-setup-number {
-  flex-shrink: 0;
+.setup-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 6px 12px;
+  border-radius: 8px;
+  transition: all var(--transition-fast);
+}
 
+.setup-back-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-surface-2);
+}
+
+.setup-session-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: rgba(6, 182, 212, 0.08);
+  border: 1px solid rgba(6, 182, 212, 0.25);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--cyan-bright);
+  letter-spacing: 1px;
+}
+
+/* Header */
+.setup-header {
+  text-align: center;
+  margin-bottom: 36px;
+}
+
+.setup-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 14px;
+  border-radius: 999px;
+  background: rgba(6, 182, 212, 0.08);
+  border: 1px solid rgba(6, 182, 212, 0.3);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--cyan-bright);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  margin-bottom: 14px;
+}
+
+.setup-header h1 {
+  font-size: clamp(26px, 3.5vw, 38px);
+  font-weight: 800;
+  margin-bottom: 8px;
+  letter-spacing: -0.02em;
+}
+
+.setup-subtitle {
+  font-size: 15px;
+  color: var(--text-secondary);
+  max-width: 680px;
+  margin: 0 auto;
+  line-height: 1.5;
+}
+
+/* Grid Layout */
+.setup-grid-layout {
+  display: grid;
+  grid-template-columns: 1.75fr 1fr;
+  gap: 28px;
+  align-items: start;
+}
+
+@media (max-width: 1024px) {
+  .setup-grid-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.setup-main-flow {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* Card Wrapper */
+.setup-card {
+  padding: 26px 24px;
+  border-radius: 18px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-card);
+  backdrop-filter: blur(14px);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+}
+
+.setup-step-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  margin-bottom: 22px;
+}
+
+.step-num {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 800;
+  width: 32px;
+  height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
-
-  width: 36px;
-  height: 36px;
-
-  border-radius: 10px;
-
-  background: #faf7ff;
-  border: 1px solid #e7dcf0;
-
-  color: #7c5a8d;
-
-  font-size: 11px;
-  font-weight: 800;
+  border-radius: 8px;
+  background: rgba(6, 182, 212, 0.12);
+  border: 1px solid rgba(6, 182, 212, 0.3);
+  color: var(--cyan-bright);
+  flex-shrink: 0;
 }
 
-.interview-setup-heading p {
-  margin: 0 0 3px;
-
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 1.2px;
-
-  color: #8b6b99;
-}
-
-.interview-setup-heading h2 {
-  margin: 0;
-
-  font-size: 20px;
-  line-height: 1.3;
-  font-weight: 750;
-
-  color: #3f3745;
-}
-
-
-/* =====================================================
-   OPTIONS
-===================================================== */
-
-.interview-option-grid {
-  display: grid;
-
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 11px;
-}
-
-.interview-option {
-  width: 100%;
-  min-height: 54px;
-
-  box-sizing: border-box;
-
-  padding: 14px 16px;
-
-  border: 1px solid #e4dbe2;
-  border-radius: 12px;
-
-  background: #fffdfc !important;
-  color: #514854 !important;
-
-  font-family: inherit;
-  font-size: 14px;
-  font-weight: 650;
-
-  text-align: left;
-
-  cursor: pointer;
-
-  transition:
-    border-color 0.2s ease,
-    background-color 0.2s ease,
-    transform 0.2s ease,
-    box-shadow 0.2s ease;
-}
-
-.interview-option:hover {
-  transform: translateY(-1px);
-
-  border-color: #cdb9d8;
-
-  background: #fdfaff !important;
-  color: #493d4d !important;
-
-  box-shadow:
-    0 5px 15px rgba(63, 55, 69, 0.06);
-}
-
-
-/* =====================================================
-   SELECTED OPTION
-===================================================== */
-
-.interview-option.active {
-  border-color: #b99bc9 !important;
-
-  background: #f5eef9 !important;
-  color: #60456d !important;
-
-  box-shadow:
-    0 4px 12px rgba(139, 107, 153, 0.08);
-}
-
-
-/* =====================================================
-   CUSTOM ROLE
-===================================================== */
-
-.custom-role {
-  margin-top: 19px;
-  padding-top: 18px;
-
-  border-top: 1px solid #eee7eb;
-}
-
-.custom-role label {
-  display: block;
-
-  margin-bottom: 8px;
-
-  font-size: 13px;
+.setup-step-header h3 {
+  font-size: 17px;
   font-weight: 700;
-
-  color: #5b515e;
+  margin-bottom: 3px;
+  color: var(--text-primary);
 }
 
-.custom-role input {
-  width: 100%;
-  min-height: 50px;
-
-  box-sizing: border-box;
-
-  padding: 13px 15px;
-
-  border: 1px solid #ded3dc;
-  border-radius: 11px;
-
-  background: #ffffff !important;
-  color: #3f3745 !important;
-
-  font-family: inherit;
-  font-size: 14px;
-
-  outline: none;
-
-  transition:
-    border-color 0.2s ease,
-    box-shadow 0.2s ease;
+.setup-step-header p {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.4;
 }
 
-.custom-role input::placeholder {
-  color: #9b919d !important;
-}
-
-.custom-role input:focus {
-  border-color: #b99bc9;
-
-  box-shadow:
-    0 0 0 3px rgba(185, 155, 201, 0.12);
-}
-
-
-/* =====================================================
-   SUMMARY
-===================================================== */
-
-.interview-setup-summary {
-  width: 100%;
-
-  box-sizing: border-box;
-
-  margin: 28px 0 18px;
-  padding: 20px;
-
-  border: 1px solid #e7dced;
-  border-radius: 16px;
-
-  background: #faf7ff;
-}
-
-.summary-label {
-  margin: 0 0 11px;
-
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 1.2px;
-
-  color: #8b6b99;
-}
-
-.summary-details {
-  display: flex;
-  flex-wrap: wrap;
-
-  gap: 8px;
-}
-
-.summary-details span {
-  padding: 8px 12px;
-
-  border: 1px solid #e5dce9;
-  border-radius: 999px;
-
-  background: #ffffff;
-
-  color: #5a505e;
-
+/* Field Labels */
+.setup-field-label {
+  display: block;
   font-size: 12px;
-  font-weight: 650;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
 }
 
+/* Pills Wrappers */
+.setup-pills-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
 
-/* =====================================================
-   START BUTTON
-===================================================== */
-
-.interview-setup-start {
-  display: block;
-
-  width: 100%;
-  min-height: 54px;
-
-  padding: 15px 22px;
-
-  border: none;
-  border-radius: 12px;
-
-  background: #3f3745 !important;
-  color: #ffffff !important;
-
-  font-family: inherit;
-  font-size: 14px;
-  font-weight: 750;
-
+.setup-pill-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  background: var(--bg-surface-2);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 500;
   cursor: pointer;
-
-  transition:
-    transform 0.2s ease,
-    box-shadow 0.2s ease;
+  transition: all var(--transition-fast);
 }
 
-.interview-setup-start:hover {
-  transform: translateY(-2px);
-
-  box-shadow:
-    0 9px 22px rgba(63, 55, 69, 0.14);
+.setup-pill-btn:hover {
+  color: var(--text-primary);
+  border-color: rgba(6, 182, 212, 0.4);
 }
 
+.setup-pill-btn.small {
+  padding: 6px 11px;
+  font-size: 12px;
+}
 
-/* =====================================================
-   BACK BUTTON
-===================================================== */
+.setup-pill-btn.selected {
+  background: rgba(6, 182, 212, 0.12);
+  border-color: var(--cyan-bright);
+  color: var(--cyan-bright);
+  font-weight: 700;
+  box-shadow: 0 0 12px rgba(6, 182, 212, 0.15);
+}
 
-.interview-setup-back {
-  display: block;
+/* Custom Input */
+.setup-custom-input {
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--bg-surface-2);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  font-size: 13px;
+  outline: none;
+  transition: border-color var(--transition-fast);
+}
 
-  margin: 20px auto 0;
-  padding: 5px;
+.setup-custom-input:focus {
+  border-color: var(--cyan-bright);
+  box-shadow: 0 0 0 2px rgba(6, 182, 212, 0.2);
+}
 
-  border: none;
+/* Difficulty Cards Grid */
+.difficulty-toggle-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
 
-  background: transparent !important;
-  color: #7c5a8d !important;
+.diff-card-btn {
+  padding: 16px 14px;
+  border-radius: 12px;
+  background: var(--bg-surface-2);
+  border: 1px solid var(--border-subtle);
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
 
-  font-family: inherit;
+.diff-card-btn:hover {
+  border-color: rgba(6, 182, 212, 0.4);
+}
+
+.diff-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.diff-pill {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 800;
+  padding: 2px 7px;
+  border-radius: 5px;
+}
+
+.diff-pill.easy {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.diff-pill.hard {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.diff-card-btn.selected.easy {
+  border-color: #10b981;
+  background: rgba(16, 185, 129, 0.08);
+  box-shadow: 0 0 16px rgba(16, 185, 129, 0.15);
+}
+
+.diff-card-btn.selected.hard {
+  border-color: #ef4444;
+  background: rgba(239, 68, 68, 0.08);
+  box-shadow: 0 0 16px rgba(239, 68, 68, 0.15);
+}
+
+.diff-card-btn p {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+  margin: 0;
+}
+
+/* Modality Cards Grid */
+.modality-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+.modality-select-btn {
+  padding: 16px;
+  border-radius: 12px;
+  background: var(--bg-surface-2);
+  border: 1px solid var(--border-subtle);
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: all var(--transition-fast);
+}
+
+.modality-select-btn:hover {
+  background: var(--bg-surface-3);
+  border-color: rgba(6, 182, 212, 0.4);
+}
+
+.modality-select-btn.selected {
+  background: rgba(6, 182, 212, 0.08);
+  border-color: var(--cyan-bright);
+  box-shadow: 0 0 20px rgba(6, 182, 212, 0.15);
+}
+
+.modality-select-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.modality-icon-wrap {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: var(--bg-card);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modality-badge-tag {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--text-muted);
+  letter-spacing: 0.5px;
+}
+
+.modality-title {
+  font-size: 14px;
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+.modality-desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+  margin: 0;
+}
+
+/* Length / Time Pills */
+.length-pills-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 10px;
+}
+
+.length-card-btn {
+  padding: 12px 10px;
+  border-radius: 10px;
+  background: var(--bg-surface-2);
+  border: 1px solid var(--border-subtle);
+  text-align: center;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  transition: all var(--transition-fast);
+}
+
+.length-card-btn:hover {
+  border-color: rgba(6, 182, 212, 0.4);
+}
+
+.length-card-btn.selected {
+  background: rgba(16, 185, 129, 0.08);
+  border-color: #10b981;
+  color: #34d399;
+}
+
+.length-card-btn strong {
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.length-card-btn.selected strong {
+  color: #34d399;
+}
+
+.length-card-btn span {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* Telemetry HUD Sidebar */
+.setup-hud-sidebar {
+  position: sticky;
+  top: 90px;
+}
+
+.hud-sticky-card {
+  padding: 24px;
+  border-radius: 18px;
+  background: rgba(10, 15, 30, 0.95);
+  border: 1px solid rgba(6, 182, 212, 0.3);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 20px rgba(6, 182, 212, 0.1);
+  backdrop-filter: blur(14px);
+}
+
+.hud-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-mono);
   font-size: 13px;
   font-weight: 700;
+  color: var(--cyan-bright);
+  padding-bottom: 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  margin-bottom: 16px;
+}
 
+.hud-params-list {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  margin-bottom: 20px;
+}
+
+.hud-param-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  gap: 12px;
+}
+
+.param-label {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.param-value {
+  color: var(--text-primary);
+  text-align: right;
+  word-break: break-word;
+}
+
+.param-badge {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 4px;
+}
+
+.param-badge.easy {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+}
+
+.param-badge.medium {
+  background: rgba(6, 182, 212, 0.15);
+  color: var(--cyan-bright);
+}
+
+.param-badge.hard {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+}
+
+.hud-security-guarantee {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 8px;
+  background: rgba(16, 185, 129, 0.05);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-bottom: 18px;
+  line-height: 1.4;
+}
+
+.hud-launch-button {
+  width: 100%;
+  padding: 14px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, var(--cyan-bright), #0284c7);
+  border: none;
+  color: #030712;
+  font-size: 14px;
+  font-weight: 800;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-shadow: 0 0 20px rgba(6, 182, 212, 0.4);
+  transition: all var(--transition-fast);
 }
 
-.interview-setup-back:hover {
-  color: #62476f !important;
-  text-decoration: underline;
+.hud-launch-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 0 30px rgba(6, 182, 212, 0.6);
 }
 
-
-/* =====================================================
-   DARK MODE
-   Uses the app's .dark class
-===================================================== */
-
-.dark .interview-setup-page {
-  background: #18151b;
-  color: #e9e1eb;
-}
-
-
-/* =====================================================
-   DARK — HERO
-===================================================== */
-
-.dark .interview-setup-hero h1 {
-  color: #f8fafc;
-}
-
-.dark .interview-setup-eyebrow {
-  color: #c0a0cf;
-}
-
-.dark .interview-setup-description {
-  color: #c5bbc9;
-}
-
-
-/* =====================================================
-   DARK — GROUP
-===================================================== */
-
-.dark .interview-setup-group {
-  border-color: #39323c;
-  background: #231e25;
-}
-
-
-/* =====================================================
-   DARK — HEADING
-===================================================== */
-
-.dark .interview-setup-heading p {
-  color: #b99bc8;
-}
-
-.dark .interview-setup-heading h2 {
-  color: #eee7f0;
-}
-
-.dark .interview-setup-number {
-  background: #2c2530;
-  border-color: #493b50;
-
-  color: #c4a8d0;
-}
-
-
-/* =====================================================
-   DARK — OPTIONS
-===================================================== */
-
-.dark .interview-option {
-  border-color: #403841 !important;
-
-  background: #29242b !important;
-  color: #ddd4df !important;
-}
-
-.dark .interview-option:hover {
-  border-color: #6f5a76 !important;
-
-  background: #302a33 !important;
-  color: #f0e8f2 !important;
-}
-
-.dark .interview-option.active {
-  border-color: #9476a2 !important;
-
-  background: #382d3d !important;
-  color: #dfc9e8 !important;
-}
-
-
-/* =====================================================
-   DARK — CUSTOM ROLE
-===================================================== */
-
-.dark .custom-role {
-  border-top-color: #39323c;
-}
-
-.dark .custom-role label {
-  color: #cfc5d1;
-}
-
-.dark .custom-role input {
-  border-color: #453d47 !important;
-
-  background: #29242b !important;
-  color: #eee7f0 !important;
-}
-
-.dark .custom-role input::placeholder {
-  color: #938995 !important;
-}
-
-.dark .custom-role input:focus {
-  border-color: #9476a2;
-
-  box-shadow:
-    0 0 0 3px rgba(148, 118, 162, 0.14);
-}
-
-
-/* =====================================================
-   DARK — SUMMARY
-===================================================== */
-
-.dark .interview-setup-summary {
-  border-color: #453a4b;
-
-  background: #29222e;
-}
-
-.dark .summary-label {
-  color: #b99bc8;
-}
-
-.dark .summary-details span {
-  border-color: #463c4b;
-
-  background: #312a34;
-
-  color: #d8cedb;
-}
-
-
-/* =====================================================
-   DARK — START BUTTON
-===================================================== */
-
-.dark .interview-setup-start {
-  background: #eee6f1 !important;
-  color: #2b252d !important;
-}
-
-.dark .interview-setup-start:hover {
-  background: #ffffff !important;
-  color: #2b252d !important;
-}
-
-
-/* =====================================================
-   DARK — BACK BUTTON
-===================================================== */
-
-.dark .interview-setup-back {
-  color: #c1a0d0 !important;
-}
-
-.dark .interview-setup-back:hover {
-  color: #dfc8e8 !important;
-}
-
-
-/* =====================================================
-   MOBILE
-===================================================== */
-
-@media (max-width: 700px) {
-  .interview-setup-page {
-    padding: 55px 18px 75px;
-  }
-
-  .interview-setup-hero h1 {
-    font-size: 38px;
-  }
-
-  .interview-setup-description {
-    font-size: 15px;
-  }
-
-  .interview-setup-group {
-    padding: 21px;
-  }
-
-  .interview-option-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .interview-setup-heading h2 {
-    font-size: 19px;
-  }
+.hud-launch-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
 }

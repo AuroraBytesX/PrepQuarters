@@ -1,37 +1,141 @@
 import "./App.css";
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
 
 import Navbar from "./components/Navbar";
+import MagicLight from "./components/MagicLight";
+import ProtectedRoute from "./components/ProtectedRoute";
 import Home from "./pages/Home";
 import Features from "./pages/Features";
 import LearnMore from "./pages/LearnMore";
 import Login from "./Login";
 import Dashboard from "./pages/Dashboard";
 import InterviewPractice from "./pages/InterviewPractice";
-import AIInterviewSession from "./pages/AIInterviewSession";
 import InterviewSetup from "./pages/InterviewSetup";
-
+import AIInterviewSession from "./pages/AIInterviewSession";
+import InterviewReplay from "./pages/InterviewReplay";
+import QuestionLibrary from "./pages/QuestionLibrary";
+import SkillGapPage from "./pages/SkillGapPage";
+import SystemDocs from "./pages/SystemDocs";
+import ResumeAnalyzer from "./pages/ResumeAnalyzer";
 
 function App() {
   return (
     <>
+      <MagicLight />
       <Navbar />
 
       <Routes>
+        {/* Public Routes */}
         <Route path="/" element={<Home />} />
         <Route path="/features" element={<Features />} />
         <Route path="/learn-more" element={<LearnMore />} />
+        <Route path="/docs" element={<SystemDocs />} />
+        <Route path="/system-docs" element={<SystemDocs />} />
+        <Route path="/resume-analyzer" element={<ResumeAnalyzer />} />
+        <Route path="/practice/resume-analyzer" element={<ResumeAnalyzer />} />
         <Route path="/login" element={<Login />} />
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/practice/ai-interview" element={<InterviewPractice />} />
+        <Route path="/practice/question-library" element={<QuestionLibrary />} />
+
+        {/* Authenticated Candidate Routes */}
         <Route
-  path="/practice/ai-interview/session"
-  element={<AIInterviewSession />}
-/>
+          path="/dashboard"
+          element={
+            <ProtectedRoute>
+              <Dashboard />
+            </ProtectedRoute>
+          }
+        />
         <Route
-  path="/practice/ai-interview/setup"
-  element={<InterviewSetup />}
-/>
+          path="/practice/ai-interview"
+          element={
+            <ProtectedRoute>
+              <InterviewPractice />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/practice/ai-interview/setup"
+          element={
+            <ProtectedRoute>
+              <InterviewSetup />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/practice/ai-interview/session"
+          element={
+            <ProtectedRoute>
+              <AIInterviewSession />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/practice/replay/:sessionId"
+          element={
+            <ProtectedRoute>
+              <InterviewReplay />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/practice/progress"
+          element={
+            <ProtectedRoute>
+              <SkillGapPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/practice/skill-gap"
+          element={
+            <ProtectedRoute>
+              <SkillGapPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/practice/feedback"
+          element={
+            <ProtectedRoute>
+              <Dashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/practice/personalized"
+          element={
+            <ProtectedRoute>
+              <InterviewSetup />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/practice/difficulty"
+          element={
+            <ProtectedRoute>
+              <InterviewSetup />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/practice/role-based"
+          element={
+            <ProtectedRoute>
+              <InterviewSetup />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/practice/timed"
+          element={
+            <ProtectedRoute>
+              <InterviewSetup />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Fallback */}
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </>
   );
