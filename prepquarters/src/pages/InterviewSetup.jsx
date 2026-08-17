@@ -384,7 +384,7 @@ function InterviewSetup() {
     };
 
     try {
-      const res = await fetch("http://localhost:5000/api/interview/start", {
+      const res = await fetch("https://prepquarters-backend.onrender.com/api/interview/start", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

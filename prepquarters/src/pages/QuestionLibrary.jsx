@@ -111,7 +111,7 @@ function QuestionLibrary() {
         params.append("search", searchQuery.trim());
       }
 
-      const res = await fetch(`http://localhost:5000/api/interview/library/questions?${params.toString()}`);
+      const res = await fetch(`https://prepquarters-backend.onrender.com/api/interview/library/questions?${params.toString()}`);
       if (res.ok) {
         const data = await res.json();
         if (data.success && Array.isArray(data.questions)) {
@@ -157,7 +157,7 @@ function QuestionLibrary() {
         : "Technical Interview";
 
     try {
-      const res = await fetch("http://localhost:5000/api/interview/start", {
+      const res = await fetch("https://prepquarters-backend.onrender.com/api/interview/start", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

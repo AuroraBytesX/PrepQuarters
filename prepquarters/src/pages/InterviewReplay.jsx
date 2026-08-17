@@ -79,7 +79,7 @@ function InterviewReplay() {
 
     const fetchReplay = async () => {
       try {
-        const res = await fetch(`http://localhost:5000/api/interview/${sessionId}/replay`, {
+        const res = await fetch(`https://prepquarters-backend.onrender.com/api/interview/${sessionId}/replay`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },

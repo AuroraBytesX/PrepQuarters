@@ -37,7 +37,7 @@ function SkillGapPage() {
 
     const fetchStats = async () => {
       try {
-        const res = await fetch("http://localhost:5000/api/interview/stats/summary", {
+        const res = await fetch("https://prepquarters-backend.onrender.com/api/interview/stats/summary", {
           headers: {
             Authorization: `Bearer ${token}`,
           },

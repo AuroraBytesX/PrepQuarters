@@ -145,7 +145,7 @@ function ResumeAnalyzer() {
     setReport(null);
 
     try {
-      const res = await fetch("http://localhost:5000/api/resume/analyze", {
+      const res = await fetch("https://prepquarters-backend.onrender.com/api/resume/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -181,7 +181,7 @@ function ResumeAnalyzer() {
     setIsAiThinking(true);
 
     try {
-      const res = await fetch("http://localhost:5000/api/resume/build/chat-assist", {
+      const res = await fetch("https://prepquarters-backend.onrender.com/api/resume/build/chat-assist", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -213,7 +213,7 @@ function ResumeAnalyzer() {
   const handleGenerateLatex = async () => {
     setGeneratingLatex(true);
     try {
-      const res = await fetch("http://localhost:5000/api/resume/build/generate-latex", {
+      const res = await fetch("https://prepquarters-backend.onrender.com/api/resume/build/generate-latex", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ resumeData: builtResume }),

@@ -294,7 +294,7 @@ function AIInterviewSession() {
               console.info("[STT_REQUEST_SENT] Dispatching transcription request to Groq Whisper...");
               setMicStatusMessage("Transcribing audio via neural Whisper pipeline...");
 
-              const res = await fetch("http://localhost:5000/api/interview/transcribe-audio", {
+              const res = await fetch("https://prepquarters-backend.onrender.com/api/interview/transcribe-audio", {
                 method: "POST",
                 headers: {
                   Authorization: `Bearer ${token}`,
@@ -403,7 +403,7 @@ function AIInterviewSession() {
 
   const fetchSessionState = async (sessionId, token) => {
     try {
-      const res = await fetch(`http://localhost:5000/api/interview/${sessionId}`, {
+      const res = await fetch(`https://prepquarters-backend.onrender.com/api/interview/${sessionId}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -445,7 +445,7 @@ function AIInterviewSession() {
 
     try {
       const token = localStorage.getItem("prepquartersToken");
-      const res = await fetch(`http://localhost:5000/api/interview/${session._id}/run-code`, {
+      const res = await fetch(`https://prepquarters-backend.onrender.com/api/interview/${session._id}/run-code`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -487,7 +487,7 @@ function AIInterviewSession() {
     const token = localStorage.getItem("prepquartersToken");
 
     try {
-      const res = await fetch(`http://localhost:5000/api/interview/${session._id}/answer`, {
+      const res = await fetch(`https://prepquarters-backend.onrender.com/api/interview/${session._id}/answer`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -546,7 +546,7 @@ function AIInterviewSession() {
 
     try {
       const token = localStorage.getItem("prepquartersToken");
-      const res = await fetch(`http://localhost:5000/api/interview/${session._id}/finish`, {
+      const res = await fetch(`https://prepquarters-backend.onrender.com/api/interview/${session._id}/finish`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

@@ -43,7 +43,7 @@ function SystemDocs() {
   const fetchDocs = async () => {
     setLoading(true);
     try {
-      const res = await fetch("http://localhost:5000/api/system/docs");
+      const res = await fetch("https://prepquarters-backend.onrender.com/api/system/docs");
       if (res.ok) {
         const data = await res.json();
         if (data.success && data.docs) {

@@ -64,7 +64,7 @@ function Dashboard() {
 
     try {
       // 1. Fetch aggregate statistics
-      const statsRes = await fetch("http://localhost:5000/api/interview/stats/summary", {
+      const statsRes = await fetch("https://prepquarters-backend.onrender.com/api/interview/stats/summary", {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -78,7 +78,7 @@ function Dashboard() {
       }
 
       // 2. Fetch session history
-      const historyRes = await fetch("http://localhost:5000/api/interview/history/all", {
+      const historyRes = await fetch("https://prepquarters-backend.onrender.com/api/interview/history/all", {
         headers: {
           Authorization: `Bearer ${token}`,
         },
