@@ -2,7 +2,7 @@
  * Email Delivery Service
  * PrepQuarters Engineering Platform
  * Handles outbound contact form delivery to tapashidhar2004@gmail.com
- * via SMTP (Nodemailer), Resend API, or SendGrid API.
+ * and secure 6-digit password reset OTP codes via SMTP (Nodemailer) or Resend API.
  */
 
 const nodemailer = require("nodemailer");
@@ -17,6 +17,40 @@ const DEFAULT_RECEIVER = "tapashidhar2004@gmail.com";
 function isValidEmail(email) {
   if (!email || typeof email !== "string") return false;
   return EMAIL_REGEX.test(email.trim().toLowerCase());
+}
+
+/**
+ * Reusable SMTP transporter helper with connection pooling and fast timeouts.
+ */
+function getSmtpTransporter() {
+  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+    return null;
+  }
+
+  const cleanUser = process.env.SMTP_USER.trim();
+  const cleanPass = process.env.SMTP_PASS.replace(/\s+/g, ""); // Strip all spaces from app passwords
+  const host = process.env.SMTP_HOST || (cleanUser.includes("@gmail.com") ? "smtp.gmail.com" : "localhost");
+  const port = Number(process.env.SMTP_PORT) || 465;
+  const secure = process.env.SMTP_SECURE === "true" || port === 465;
+
+  return nodemailer.createTransport({
+    host,
+    port,
+    secure,
+    auth: {
+      user: cleanUser,
+      pass: cleanPass,
+    },
+    pool: true,
+    maxConnections: 3,
+    maxMessages: 100,
+    connectionTimeout: 8000,
+    greetingTimeout: 8000,
+    socketTimeout: 10000,
+    tls: {
+      rejectUnauthorized: false,
+    },
+  });
 }
 
 /**
@@ -127,45 +161,19 @@ GitHub: https://github.com/AuroraBytesX/PrepQuarters
           recipient,
           message: "Message sent successfully to support.",
         };
-      } else {
-        console.warn(`[EMAIL_DELIVERY_ERROR] Resend API returned error:`, resendData);
-        return {
-          success: false,
-          delivered: false,
-          error: resendData.message || "Failed to deliver email via Resend API.",
-          message: "Unable to deliver message through email service.",
-        };
       }
     } catch (err) {
       console.error(`[EMAIL_DELIVERY_ERROR] Resend API fetch failed:`, err.message);
-      return {
-        success: false,
-        delivered: false,
-        error: err.message,
-        message: "Unable to connect to email delivery service.",
-      };
     }
   }
 
-  // 2. Check for SMTP Configuration (e.g. Gmail SMTP, SendGrid SMTP, AWS SES)
-  if (process.env.SMTP_USER && process.env.SMTP_PASS) {
+  // 2. Check for SMTP Configuration (Gmail SMTP)
+  const transporter = getSmtpTransporter();
+  if (transporter) {
     try {
-      const host = process.env.SMTP_HOST || (process.env.SMTP_USER.includes("@gmail.com") ? "smtp.gmail.com" : "localhost");
-      const port = Number(process.env.SMTP_PORT) || 465;
-      const secure = process.env.SMTP_SECURE === "true" || port === 465;
-
-      const transporter = nodemailer.createTransport({
-        host,
-        port,
-        secure,
-        auth: {
-          user: process.env.SMTP_USER.trim(),
-          pass: process.env.SMTP_PASS.trim(),
-        },
-      });
-
+      const cleanUser = process.env.SMTP_USER.trim();
       const info = await transporter.sendMail({
-        from: `"${cleanName} via PrepQuarters" <${process.env.SMTP_USER.trim()}>`,
+        from: `"${cleanName} via PrepQuarters" <${cleanUser}>`,
         to: recipient,
         replyTo: cleanEmail,
         subject,
@@ -193,7 +201,6 @@ GitHub: https://github.com/AuroraBytesX/PrepQuarters
     }
   }
 
-  // 3. If no external SMTP/API credentials are configured, explicitly report missing configuration
   console.warn(
     `[EMAIL_CONFIG_NOTICE] EMAIL DELIVERY BLOCKED - MISSING ENVIRONMENT VARIABLE: Requires SMTP_USER & SMTP_PASS or RESEND_API_KEY in server/.env.\n` +
     `[CONTACT_SUBMISSION_RECORDED] From: ${cleanName} <${cleanEmail}> -> To: ${recipient} | Length: ${cleanMessage.length} chars`
@@ -310,24 +317,12 @@ Security & Support: https://github.com/AuroraBytesX/PrepQuarters
   }
 
   // 2. SMTP Transport (Gmail / Custom SMTP)
-  if (process.env.SMTP_USER && process.env.SMTP_PASS) {
+  const transporter = getSmtpTransporter();
+  if (transporter) {
     try {
-      const host = process.env.SMTP_HOST || (process.env.SMTP_USER.includes("@gmail.com") ? "smtp.gmail.com" : "localhost");
-      const port = Number(process.env.SMTP_PORT) || 465;
-      const secure = process.env.SMTP_SECURE === "true" || port === 465;
-
-      const transporter = nodemailer.createTransport({
-        host,
-        port,
-        secure,
-        auth: {
-          user: process.env.SMTP_USER.trim(),
-          pass: process.env.SMTP_PASS.trim(),
-        },
-      });
-
+      const cleanUser = process.env.SMTP_USER.trim();
       const info = await transporter.sendMail({
-        from: `"PrepQuarters Security" <${process.env.SMTP_USER.trim()}>`,
+        from: `"PrepQuarters Security" <${cleanUser}>`,
         to: cleanEmail,
         subject,
         text: textContent,

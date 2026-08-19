@@ -59,6 +59,19 @@ function Navbar() {
     return () => window.removeEventListener("storage", checkUser);
   }, []);
 
+  // Automatic provider prompt on initial entry / post-login
+  useEffect(() => {
+    if (user && location.pathname !== "/login" && location.pathname !== "/signup") {
+      const showPromptFlag = sessionStorage.getItem("prepquarters_show_provider_modal") === "true";
+      const isConfigured = localStorage.getItem("prepquarters_ai_provider_configured") === "true";
+
+      if (showPromptFlag || !isConfigured) {
+        setProviderModalOpen(true);
+        sessionStorage.removeItem("prepquarters_show_provider_modal");
+      }
+    }
+  }, [user, location.pathname]);
+
   // Close mobile menu on navigation change
   useEffect(() => {
     setMobileMenuOpen(false);

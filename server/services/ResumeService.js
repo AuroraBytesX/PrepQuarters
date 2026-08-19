@@ -463,7 +463,24 @@ function validateCandidateInput({ step, message, currentGraph = {} }) {
       (w) =>
         /^[asdfghjklqwertyuiopzxcvbnm]{4,}$/i.test(w) &&
         !validTechTerms.has(w.toLowerCase())
-    );
+    );  // Check for questions asked by the candidate
+  const isQuestion = clean.endsWith("?") || /^(what|how|why|where|can you|should i|could you|does|is it|what is|tell me)\b/i.test(clean);
+  if (isQuestion) {
+    let questionAnswer = "That is a great question! For a technical resume, recruiters and ATS scanners prioritize clear impact metrics, modern tech stacks, and concise bullet points.";
+    if (clean.toLowerCase().includes("ats")) {
+      questionAnswer = "An ATS (Applicant Tracking System) parses your resume for key technical skills and experience. Keeping a clean, single-column layout without complex graphics ensures maximum visibility.";
+    } else if (clean.toLowerCase().includes("project")) {
+      questionAnswer = "Projects with measurable results (e.g., latency reduction, API throughput, users served) stand out the most to senior hiring managers.";
+    }
+    return {
+      valid: false,
+      isQuestion: true,
+      confidence: 0.95,
+      usable: false,
+      reason: "User asked a clarifying question",
+      promptAgain: `${questionAnswer}\n\nNow, could you provide your details for this section?`,
+    };
+  }
 
   // Check character repetition e.g. "aaaaa", "zzzzzz"
   const hasExcessiveCharRepeat = /(.)\1{3,}/.test(clean);
@@ -471,8 +488,8 @@ function validateCandidateInput({ step, message, currentGraph = {} }) {
   // Check for repeated nonsense words e.g. "blah blah", "hello hello", "xyz xyz", "test test"
   const isRepeatedNonsense = /^(blah|hello|hi|xyz|test|lol|asdf|qwerty)(\s+(blah|hello|hi|xyz|test|lol|asdf|qwerty))+$/i.test(clean);
 
-  // Check generic non-informative expressions
-  const isNonInformative = /^(nothing|none|idk|i don't know|n\/a|na|no|whatever|pass)$/i.test(clean);
+  // Check generic non-informative expressions / uncertainty
+  const isNonInformative = /^(nothing|none|idk|i don't know|i dont know|not sure|no idea|n\/a|na|no|whatever|pass|what should i write)$/i.test(clean);
 
   // Check placeholder names / dummy data
   const hasPlaceholders = /^(john doe|jane doe|acme corp|example company|lorem ipsum|your name|sample project|my company|foo bar|bar baz)$/i.test(clean);
@@ -487,7 +504,7 @@ function validateCandidateInput({ step, message, currentGraph = {} }) {
     };
   }
 
-  // Step-specific context-aware validation
+  // Step-specific context-aware validation with concrete examples for uncertainty
   switch (step) {
     case "role":
     case "targetRole":
@@ -498,7 +515,7 @@ function validateCandidateInput({ step, message, currentGraph = {} }) {
           confidence: 0.95,
           usable: false,
           reason: "Role is required",
-          promptAgain: "I need a little more information to build this section. Please describe your target role.",
+          promptAgain: "No problem! You can select an engineering specialty that matches your interest. For example: **Senior Backend Engineer**, **Full Stack Developer (React & Node.js)**, **Cloud / DevOps Engineer**, or **Machine Learning Engineer**.",
         };
       }
       const validRoleSignals = [
@@ -526,14 +543,23 @@ function validateCandidateInput({ step, message, currentGraph = {} }) {
           confidence: 0.95,
           usable: false,
           reason: "Name and contact required",
-          promptAgain: "Could you please provide your full name and preferred contact info (e.g., Email, Phone, Location)?",
+          promptAgain: "Could you please provide your full name and preferred contact info (for example: *'Alex Mercer, alex@example.com, San Francisco, CA'*)?",
         };
       }
       return { valid: true, confidence: 0.95, usable: true, normalizedInformation: raw };
     }
 
     case "summary": {
-      if (isNonInformative && clean.length < 5) {
+      if (isNonInformative) {
+        return {
+          valid: false,
+          confidence: 0.90,
+          usable: false,
+          reason: "Summary clarification requested",
+          promptAgain: "A strong professional summary is 1-2 lines summarizing your experience and key focus areas. For example: *'Full Stack Engineer with 3+ years of experience architecting high-scale REST APIs, microservices, and modern React interfaces.'*",
+        };
+      }
+      if (clean.length < 5) {
         return {
           valid: false,
           confidence: 0.90,
@@ -547,13 +573,22 @@ function validateCandidateInput({ step, message, currentGraph = {} }) {
 
     case "education": {
       if (isNonInformative) {
-        return { valid: true, confidence: 0.90, usable: true, normalizedInformation: "Self-Directed Practical Engineering" };
+        return { valid: true, confidence: 0.90, usable: true, normalizedInformation: "Self-Directed Practical Engineering & Continuous Technical Learning" };
       }
       return { valid: true, confidence: 0.95, usable: true, normalizedInformation: raw };
     }
 
     case "experience": {
-      if (isNonInformative || clean.length < 4) {
+      if (isNonInformative) {
+        return {
+          valid: false,
+          confidence: 0.92,
+          usable: false,
+          reason: "Experience guidance requested",
+          promptAgain: "That's completely fine! You can describe any job, internship, or freelance project. For example: *'Software Engineer at CloudTech: Engineered microservices in Node.js and PostgreSQL, reducing query latency by 40% for 50k daily active users.'*",
+        };
+      }
+      if (clean.length < 4) {
         return {
           valid: false,
           confidence: 0.92,
@@ -566,7 +601,16 @@ function validateCandidateInput({ step, message, currentGraph = {} }) {
     }
 
     case "skills": {
-      if (isNonInformative || clean.length < 2) {
+      if (isNonInformative) {
+        return {
+          valid: false,
+          confidence: 0.92,
+          usable: false,
+          reason: "Skills guidance requested",
+          promptAgain: "Here are some core engineering technologies you can list:\n- **Languages**: TypeScript, JavaScript, Python, Go, Java, SQL\n- **Frameworks**: React, Express, Node.js, Next.js, FastAPI\n- **Cloud & Tools**: Docker, AWS, Git, Redis, PostgreSQL",
+        };
+      }
+      if (clean.length < 2) {
         return {
           valid: false,
           confidence: 0.92,
@@ -579,7 +623,16 @@ function validateCandidateInput({ step, message, currentGraph = {} }) {
     }
 
     case "projects": {
-      if (isNonInformative || clean.length < 4) {
+      if (isNonInformative) {
+        return {
+          valid: false,
+          confidence: 0.92,
+          usable: false,
+          reason: "Project guidance requested",
+          promptAgain: "You can highlight any open-source tool, personal application, or capstone project. For example: *'Distributed Task Queue built with Python, Redis, and Celery, supporting rate limiting and automatic retry workers for 10k jobs/min.'*",
+        };
+      }
+      if (clean.length < 4) {
         return {
           valid: false,
           confidence: 0.92,
@@ -592,7 +645,7 @@ function validateCandidateInput({ step, message, currentGraph = {} }) {
     }
 
     default:
-      return { valid: true, confidence: 0.90, usable: true, normalizedInformation: raw };
+      return { valid: true, confidence: 0.85, usable: true, normalizedInformation: raw };
   }
 }
 

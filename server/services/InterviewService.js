@@ -504,11 +504,11 @@ Topic: "${currentQuestion.topic}"
 Expected Architecture Points: ${JSON.stringify(currentQuestion.expectedKeyPoints || [])}
 
 CRITICAL SYSTEM DESIGN EVALUATION RULES:
-1. Evaluate architectural design thinking: requirement clarification, component boundaries, scale (RPS/latency), data storage, caching, queues, failure modes, and trade-offs.
-2. DO NOT require or expect the candidate to write code syntax or functions.
-3. ZERO SCORE RULE: Gibberish, unrelated text, or empty answers receive Score = 0.
-4. PARTIAL CREDIT (3-5): For naming components without analyzing scaling trade-offs or failure modes.
-5. HIGH MARKS (7-10): For comprehensive architectures addressing scale, multi-region partitions, and trade-offs.
+1. QUESTION ECHO / REPETITION CHECK (MANDATORY): If the candidate's answer merely repeats, echoes, or paraphrases the question (or states 'I will design this system' without proposing component boundaries, data stores, queues, or trade-offs), set "relevant": false, "technicallyMeaningful": false, and "score": 0. Repeating the question earns ZERO points.
+2. TECHNICAL CORRECTNESS OVER WORD COUNT: Never award points simply because an answer contains many words or buzzwords. If the architecture is fundamentally wrong, off-topic, or an empty keyword dump, score must be 0 or 1/10.
+3. ZERO SCORE RULE (Score = 0): Gibberish, unrelated text, copied questions, or buzzword dumps receive Score = 0.
+4. PARTIAL CREDIT (3-5): For naming basic components without analyzing scaling trade-offs, partitions, latency bounds, or failure modes.
+5. HIGH MARKS (7-10): Reserved strictly for comprehensive architectures addressing scale (QPS/RPS), storage partitioning, caching layers, message queues, and failure recovery trade-offs.
 
 Output valid JSON matching this schema (NO em dashes, NO emojis):
 {

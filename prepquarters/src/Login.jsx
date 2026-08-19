@@ -332,46 +332,51 @@ function Login({ initialMode = true }) {
         {/* Right Side: Auth Form */}
         <section className="auth-form-section">
           <div className="auth-form-container">
-            <div className="auth-heading">
-              <span className="auth-label">PREPQUARTERS</span>
-              <h2>{isLogin ? "Welcome back" : "Create your account"}</h2>
+            {/* Header */}
+            <div className="auth-header">
+              <h2>{isLogin ? "Welcome Back" : "Create Account"}</h2>
               <p>
                 {isLogin
-                  ? "Continue your personalized interview preparation."
-                  : "Start preparing with structured AI mock sessions."}
+                  ? "Enter your credentials to access your candidate dashboard."
+                  : "Join PrepQuarters and start practicing for senior engineering roles."}
               </p>
             </div>
 
-            {/* Login / Sign Up Toggle */}
-            <div className="auth-toggle" role="tablist">
+            {/* Mode Switch Tabs */}
+            <div className="auth-tabs" role="tablist">
               <button
                 type="button"
                 role="tab"
                 aria-selected={isLogin}
-                className={isLogin ? "active" : ""}
+                className={`auth-tab ${isLogin ? "active" : ""}`}
                 onClick={() => handleModeChange(true)}
               >
-                Login
+                Log In
               </button>
               <button
                 type="button"
                 role="tab"
                 aria-selected={!isLogin}
-                className={!isLogin ? "active" : ""}
+                className={`auth-tab ${!isLogin ? "active" : ""}`}
                 onClick={() => handleModeChange(false)}
               >
                 Sign Up
               </button>
             </div>
 
-            {/* Notification message (High Contrast in both Dark & Light Themes) */}
+            {/* Alert Notification */}
             {message && (
               <div
-                className={`auth-message ${
-                  messageType === "success" ? "auth-message-success" : "auth-message-error"
-                }`}
-                role="alert"
+                className={`auth-message ${messageType}`}
                 style={{
+                  padding: "10px 14px",
+                  borderRadius: "8px",
+                  fontSize: "0.85rem",
+                  marginBottom: "16px",
+                  background: messageType === "success" ? "var(--accent-soft)" : "rgba(239, 68, 68, 0.12)",
+                  color: messageType === "success" ? "var(--accent-primary)" : "#b91c1c",
+                  border: messageType === "success" ? "1px solid var(--accent-border)" : "1px solid rgba(239, 68, 68, 0.35)",
+                  fontWeight: 600,
                   display: "flex",
                   alignItems: "center",
                   gap: "8px",
@@ -495,8 +500,8 @@ function Login({ initialMode = true }) {
               {/* Remember Me & Forgot Password Row */}
               {isLogin && (
                 <div className="forgot-row" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", margin: "8px 0 16px" }}>
-                  <label className="remember-me" style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "0.85rem", color: "var(--text-secondary)", cursor: "pointer" }}>
-                    <input type="checkbox" defaultChecked />
+                  <label htmlFor="remember-device" className="remember-me" style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "0.85rem", color: "var(--text-secondary)", cursor: "pointer" }}>
+                    <input id="remember-device" name="rememberDevice" type="checkbox" defaultChecked />
                     <span>Remember device</span>
                   </label>
                   <button
@@ -623,11 +628,14 @@ function Login({ initialMode = true }) {
             <form onSubmit={handleForgotSubmit} style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
               {forgotStep === "request" ? (
                 <div>
-                  <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, color: "var(--text-primary)", marginBottom: "6px" }}>
+                  <label htmlFor="forgot-email" style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, color: "var(--text-primary)", marginBottom: "6px" }}>
                     Account Email
                   </label>
                   <input
+                    id="forgot-email"
+                    name="forgotEmail"
                     type="email"
+                    autoComplete="email"
                     placeholder="candidate@example.com"
                     value={forgotEmail}
                     onChange={(e) => setForgotEmail(e.target.value)}
@@ -647,11 +655,15 @@ function Login({ initialMode = true }) {
               ) : (
                 <>
                   <div>
-                    <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, color: "var(--text-primary)", marginBottom: "6px" }}>
+                    <label htmlFor="reset-otp-code" style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, color: "var(--text-primary)", marginBottom: "6px" }}>
                       6-Digit Verification Code
                     </label>
                     <input
+                      id="reset-otp-code"
+                      name="resetOtpCode"
                       type="text"
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
                       maxLength={6}
                       placeholder="123456"
                       value={resetTokenInput}
@@ -675,11 +687,14 @@ function Login({ initialMode = true }) {
                   </div>
 
                   <div>
-                    <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, color: "var(--text-primary)", marginBottom: "6px" }}>
+                    <label htmlFor="reset-new-password" style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, color: "var(--text-primary)", marginBottom: "6px" }}>
                       New Password
                     </label>
                     <input
+                      id="reset-new-password"
+                      name="newPassword"
                       type="password"
+                      autoComplete="new-password"
                       placeholder="Minimum 8 characters"
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
@@ -698,11 +713,14 @@ function Login({ initialMode = true }) {
                   </div>
 
                   <div>
-                    <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, color: "var(--text-primary)", marginBottom: "6px" }}>
+                    <label htmlFor="reset-confirm-password" style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, color: "var(--text-primary)", marginBottom: "6px" }}>
                       Confirm New Password
                     </label>
                     <input
+                      id="reset-confirm-password"
+                      name="confirmNewPassword"
                       type="password"
+                      autoComplete="new-password"
                       placeholder="Re-enter new password"
                       value={confirmNewPassword}
                       onChange={(e) => setConfirmNewPassword(e.target.value)}

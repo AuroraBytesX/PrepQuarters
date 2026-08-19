@@ -549,7 +549,9 @@ function Home() {
               </label>
               <input
                 id="home-contact-name"
+                name="name"
                 type="text"
+                autoComplete="name"
                 placeholder="Candidate Name"
                 value={nameInput}
                 onChange={(e) => setNameInput(e.target.value)}
@@ -572,7 +574,9 @@ function Home() {
               </label>
               <input
                 id="home-contact-email"
+                name="email"
                 type="email"
+                autoComplete="email"
                 placeholder="name@example.com"
                 value={emailInput}
                 onChange={(e) => setEmailInput(e.target.value)}
@@ -596,6 +600,7 @@ function Home() {
               </label>
               <textarea
                 id="home-contact-msg"
+                name="message"
                 rows={4}
                 placeholder="Write your question or feedback..."
                 value={messageInput}

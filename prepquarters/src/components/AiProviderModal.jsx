@@ -48,6 +48,7 @@ export function AiProviderModal({ isOpen, onClose, onSelectProvider }) {
         
         // Save session configuration (key held in session storage or state, not localStorage plaintext)
         sessionStorage.setItem("prepquarters_byok_key", apiKeyInput.trim());
+        localStorage.setItem("prepquarters_ai_provider_configured", "true");
         localStorage.setItem(
           "prepquarters_ai_provider",
           JSON.stringify({ mode: "byok", provider: byokProvider, configured: true })
@@ -70,6 +71,7 @@ export function AiProviderModal({ isOpen, onClose, onSelectProvider }) {
   };
 
   const handleSaveMyApi = () => {
+    localStorage.setItem("prepquarters_ai_provider_configured", "true");
     localStorage.setItem(
       "prepquarters_ai_provider",
       JSON.stringify({ mode: "my_api", provider: "platform", configured: true })
@@ -95,22 +97,22 @@ export function AiProviderModal({ isOpen, onClose, onSelectProvider }) {
       padding: "20px"
     }}>
       <div className="provider-modal-card" style={{
-        background: "#111827",
-        border: "1px solid rgba(255, 255, 255, 0.12)",
+        background: "var(--bg-card)",
+        border: "1px solid var(--border-glass)",
         borderRadius: "16px",
         width: "100%",
         maxWidth: "580px",
         padding: "28px",
-        boxShadow: "0 20px 40px rgba(0,0,0,0.5)",
-        color: "#f3f4f6"
+        boxShadow: "var(--shadow-dropdown)",
+        color: "var(--text-primary)"
       }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "20px" }}>
           <div>
-            <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#10b981", fontSize: "0.85rem", fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "var(--accent-primary)", fontSize: "0.85rem", fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase" }}>
               <Cpu size={16} />
               <span>AI Provider Mode</span>
             </div>
-            <h2 style={{ fontSize: "1.4rem", fontWeight: 700, margin: "6px 0 0", color: "#ffffff" }}>
+            <h2 style={{ fontSize: "1.4rem", fontWeight: 700, margin: "6px 0 0", color: "var(--text-primary)" }}>
               Choose AI Intelligence Engine
             </h2>
           </div>

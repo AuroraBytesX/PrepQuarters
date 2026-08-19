@@ -118,9 +118,43 @@ function validateCandidateAnswer({ questionText = "", topic = "", domain = "", q
     };
   }
 
+  // 5. Check for repeating / echoing the question without providing a solution
+  if (questionText && isQuestionEchoOrRepetition(cleanAnswer, questionText)) {
+    return {
+      isValid: false,
+      category: "repeated_question",
+      reason: "Your response merely repeats or paraphrases the question without proposing an architectural design or technical solution.",
+      retryPrompt: "Please provide your actual technical approach, describing component choices, scaling trade-offs, and failure mitigations.",
+    };
+  }
+
   return {
     isValid: true,
   };
+}
+
+/**
+ * Detects whether candidate answer merely echoes or repeats the question.
+ */
+function isQuestionEchoOrRepetition(answer, question) {
+  if (!answer || !question) return false;
+
+  const stopWords = new Set(["the", "and", "a", "an", "in", "on", "of", "to", "for", "is", "are", "how", "what", "would", "you", "design", "system", "describe", "explain"]);
+  const wordsA = answer.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter((w) => w.length > 2 && !stopWords.has(w));
+  const wordsQ = question.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter((w) => w.length > 2 && !stopWords.has(w));
+
+  if (wordsA.length < 3 || wordsQ.length < 3) return false;
+
+  const setQ = new Set(wordsQ);
+  const matchedWords = wordsA.filter((w) => setQ.has(w));
+  const overlapRatio = matchedWords.length / wordsA.length;
+
+  // If over 65% of candidate's keywords are directly copied from the question and answer is short
+  if (overlapRatio >= 0.65 && wordsA.length <= wordsQ.length * 1.5) {
+    return true;
+  }
+
+  return false;
 }
 
 /**

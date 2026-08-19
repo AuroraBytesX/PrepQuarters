@@ -14,9 +14,9 @@ const authLimiter = createRateLimiter({
 });
 
 /* =========================================
-   SIGN UP
+   SIGN UP & REGISTER
 ========================================= */
-router.post("/signup", authLimiter, async (req, res) => {
+const signupHandler = async (req, res) => {
   try {
     const name = sanitizeInput(req.body.name);
     const email = sanitizeInput(req.body.email);
@@ -100,13 +100,16 @@ router.post("/signup", authLimiter, async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Signup processing error:", error.message);
+    console.error("Signup error:", error.message);
     res.status(500).json({
       success: false,
-      message: "An unexpected error occurred while creating your account. Please try again.",
+      message: "An error occurred during account creation.",
     });
   }
-});
+};
+
+router.post("/signup", authLimiter, signupHandler);
+router.post("/register", authLimiter, signupHandler);
 
 /* =========================================
    LOGIN
