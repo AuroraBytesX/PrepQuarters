@@ -88,22 +88,22 @@
    LIGHT MODE TOKENS - CLEAN SAAS & PASTEL TECHNICAL PALETTE
 ========================================================= */
 [data-theme="light"] {
-  --bg-canvas: #f8fafc;
-  --bg-primary: #f8fafc;
-  --bg-secondary: #f1f5f9;
+  --bg-canvas: #ffffff;
+  --bg-primary: #ffffff;
+  --bg-secondary: #f8fafc;
   --bg-surface: #ffffff;
-  --bg-surface-glass: rgba(255, 255, 255, 0.92);
-  --bg-card: rgba(255, 255, 255, 0.88);
-  --bg-card-hover: rgba(248, 250, 252, 0.96);
+  --bg-surface-glass: rgba(255, 255, 255, 0.98);
+  --bg-card: #ffffff;
+  --bg-card-hover: #f8fafc;
   --bg-input: #ffffff;
-  --bg-dropdown: rgba(255, 255, 255, 0.98);
-  --bg-navbar: rgba(248, 250, 252, 0.92);
+  --bg-dropdown: #ffffff;
+  --bg-navbar: rgba(255, 255, 255, 0.96);
 
   /* Surface Layers in Light Mode */
   --bg-surface-1: #ffffff;
-  --bg-surface-2: #f1f5f9;
-  --bg-surface-3: #e2e8f0;
-  --border-card: rgba(148, 163, 184, 0.28);
+  --bg-surface-2: #f8fafc;
+  --bg-surface-3: #f1f5f9;
+  --border-card: #e2e8f0;
   --emerald-core: #059669;
   --cyan-bright: #0284c7;
   --cyan-core: #0891b2;
@@ -111,23 +111,23 @@
 
   /* Typography */
   --text-primary: #0f172a;
-  --text-secondary: #475569;
+  --text-secondary: #334155;
   --text-muted: #64748b;
   --text-inverse: #ffffff;
 
   /* Borders & Outlines */
-  --border-subtle: rgba(148, 163, 184, 0.22);
-  --border-medium: rgba(148, 163, 184, 0.35);
-  --border-glass: rgba(148, 163, 184, 0.28);
-  --border-hover: rgba(5, 150, 105, 0.45);
+  --border-subtle: #e2e8f0;
+  --border-medium: #cbd5e1;
+  --border-glass: #e2e8f0;
+  --border-hover: #10b981;
 
   /* Primary Accents */
   --accent-primary: #059669;
   --accent-hover: #047857;
   --accent-light: #10b981;
-  --accent-soft: rgba(5, 150, 105, 0.1);
-  --accent-glow: rgba(5, 150, 105, 0.15);
-  --accent-border: rgba(5, 150, 105, 0.3);
+  --accent-soft: rgba(5, 150, 105, 0.08);
+  --accent-glow: rgba(5, 150, 105, 0.12);
+  --accent-border: rgba(5, 150, 105, 0.25);
 
   /* Secondary Accents */
   --accent-cyan: #0284c7;
@@ -136,17 +136,17 @@
   --accent-rose: #e11d48;
 
   /* Shadows */
-  --shadow-glass: 0 10px 30px rgba(0, 0, 0, 0.05);
-  --shadow-dropdown: 0 20px 40px -10px rgba(15, 23, 42, 0.14), 0 0 0 1px rgba(148, 163, 184, 0.2);
-  --shadow-elevated: 0 25px 50px -12px rgba(15, 23, 42, 0.12);
+  --shadow-glass: 0 4px 20px rgba(0, 0, 0, 0.04);
+  --shadow-dropdown: 0 10px 30px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(0, 0, 0, 0.05);
+  --shadow-elevated: 0 16px 36px rgba(0, 0, 0, 0.08);
 
   /* Hero Canvas Tokens */
   --canvas-node-1: #059669;
   --canvas-node-2: #0284c7;
   --canvas-line: rgba(148, 163, 184, 0.16);
   --canvas-pulse: #059669;
-  --canvas-radial-1: rgba(16, 185, 129, 0.04);
-  --canvas-radial-2: rgba(56, 189, 248, 0.03);
+  --canvas-radial-1: rgba(16, 185, 129, 0.02);
+  --canvas-radial-2: rgba(56, 189, 248, 0.02);
 }
 
 * {

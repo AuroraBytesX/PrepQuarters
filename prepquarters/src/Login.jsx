@@ -21,6 +21,14 @@ function Login({ initialMode = true }) {
     return initialMode;
   });
 
+  useEffect(() => {
+    if (location.pathname === "/signup") {
+      setIsLogin(false);
+    } else if (location.pathname === "/login") {
+      setIsLogin(true);
+    }
+  }, [location.pathname]);
+
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 

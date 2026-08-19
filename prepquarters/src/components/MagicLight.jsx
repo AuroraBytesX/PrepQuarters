@@ -3,30 +3,39 @@ import "./MagicLight.css";
 
 function MagicLight() {
   const lightRef = useRef(null);
-  const posRef = useRef({ currentX: -500, currentY: -500, targetX: -500, targetY: -500, isVisible: false });
-  const animFrameRef = useRef(null);
+  const isVisibleRef = useRef(false);
 
   useEffect(() => {
-    // Check for reduced motion or coarse pointer (mobile/touch)
-    const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const isCoarsePointer = window.matchMedia("(pointer: coarse)").matches;
-    if (prefersReducedMotion || isCoarsePointer) {
+    // Check for reduced motion or coarse pointer (mobile/touch) or small screen
+    if (
+      typeof window === "undefined" ||
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches ||
+      window.matchMedia("(pointer: coarse)").matches ||
+      window.innerWidth < 900
+    ) {
       return;
     }
 
+    let ticking = false;
+
     const handlePointerMove = (e) => {
-      posRef.current.targetX = e.clientX;
-      posRef.current.targetY = e.clientY;
-      if (!posRef.current.isVisible) {
-        posRef.current.isVisible = true;
-        if (lightRef.current) {
-          lightRef.current.style.opacity = "1";
-        }
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          if (lightRef.current) {
+            lightRef.current.style.transform = `translate3d(${e.clientX - 120}px, ${e.clientY - 120}px, 0)`;
+            if (!isVisibleRef.current) {
+              isVisibleRef.current = true;
+              lightRef.current.style.opacity = "1";
+            }
+          }
+          ticking = false;
+        });
+        ticking = true;
       }
     };
 
     const handlePointerLeave = () => {
-      posRef.current.isVisible = false;
+      isVisibleRef.current = false;
       if (lightRef.current) {
         lightRef.current.style.opacity = "0";
       }
@@ -35,28 +44,9 @@ function MagicLight() {
     window.addEventListener("pointermove", handlePointerMove, { passive: true });
     document.addEventListener("mouseleave", handlePointerLeave);
 
-    const lerp = (start, end, factor) => start + (end - start) * factor;
-
-    const animate = () => {
-      const pos = posRef.current;
-      pos.currentX = lerp(pos.currentX, pos.targetX, 0.12);
-      pos.currentY = lerp(pos.currentY, pos.targetY, 0.12);
-
-      if (lightRef.current) {
-        lightRef.current.style.transform = `translate3d(${pos.currentX - 120}px, ${pos.currentY - 120}px, 0)`;
-      }
-
-      animFrameRef.current = requestAnimationFrame(animate);
-    };
-
-    animFrameRef.current = requestAnimationFrame(animate);
-
     return () => {
       window.removeEventListener("pointermove", handlePointerMove);
       document.removeEventListener("mouseleave", handlePointerLeave);
-      if (animFrameRef.current) {
-        cancelAnimationFrame(animFrameRef.current);
-      }
     };
   }, []);
 

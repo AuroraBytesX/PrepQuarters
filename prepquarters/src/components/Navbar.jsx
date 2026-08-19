@@ -59,18 +59,14 @@ function Navbar() {
     return () => window.removeEventListener("storage", checkUser);
   }, []);
 
-  // Automatic provider prompt on initial entry / post-login
+  // Automatic provider prompt on initial entry (mobile & desktop, first session visit)
   useEffect(() => {
-    if (user && location.pathname !== "/login" && location.pathname !== "/signup") {
-      const showPromptFlag = sessionStorage.getItem("prepquarters_show_provider_modal") === "true";
-      const isConfigured = localStorage.getItem("prepquarters_ai_provider_configured") === "true";
-
-      if (showPromptFlag || !isConfigured) {
-        setProviderModalOpen(true);
-        sessionStorage.removeItem("prepquarters_show_provider_modal");
-      }
+    const hasShownInSession = sessionStorage.getItem("prepquarters_provider_modal_shown") === "true";
+    if (!hasShownInSession && location.pathname !== "/login" && location.pathname !== "/signup") {
+      setProviderModalOpen(true);
+      sessionStorage.setItem("prepquarters_provider_modal_shown", "true");
     }
-  }, [user, location.pathname]);
+  }, [location.pathname]);
 
   // Close mobile menu on navigation change
   useEffect(() => {
@@ -390,36 +386,28 @@ function Navbar() {
               </button>
             </div>
           ) : (
-            <div className="desktop-only" style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <div className="desktop-only" style={{ display: "flex", alignItems: "center" }}>
               <button
                 type="button"
                 onClick={() => navigate("/login")}
                 style={{
-                  padding: "7px 14px",
-                  fontSize: "0.86rem",
-                  fontWeight: 600,
-                  color: "var(--text-primary)",
-                  borderRadius: "8px",
-                  cursor: "pointer",
-                }}
-              >
-                Log In
-              </button>
-              <button
-                type="button"
-                onClick={() => navigate("/signup")}
-                style={{
-                  padding: "7px 16px",
-                  fontSize: "0.86rem",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  padding: "8px 18px",
+                  fontSize: "0.88rem",
                   fontWeight: 600,
                   background: "var(--accent-primary)",
                   color: "#ffffff",
-                  borderRadius: "8px",
+                  borderRadius: "10px",
                   border: "none",
+                  boxShadow: "0 2px 10px rgba(16, 185, 129, 0.25)",
                   cursor: "pointer",
+                  transition: "all 0.15s ease",
                 }}
               >
-                Sign Up
+                <User size={15} />
+                <span>Log In / Sign Up</span>
               </button>
             </div>
           )}
@@ -786,48 +774,33 @@ function Navbar() {
                 <span>Sign Out</span>
               </button>
             ) : (
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginTop: "6px" }}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMobileMenuOpen(false);
-                    navigate("/login");
-                  }}
-                  style={{
-                    padding: "10px",
-                    borderRadius: "8px",
-                    background: "var(--bg-card)",
-                    border: "1px solid var(--border-medium)",
-                    color: "var(--text-primary)",
-                    fontWeight: 600,
-                    fontSize: "0.88rem",
-                    cursor: "pointer",
-                    textAlign: "center",
-                  }}
-                >
-                  Log In
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMobileMenuOpen(false);
-                    navigate("/signup");
-                  }}
-                  style={{
-                    padding: "10px",
-                    borderRadius: "8px",
-                    background: "var(--accent-primary)",
-                    border: "none",
-                    color: "#ffffff",
-                    fontWeight: 700,
-                    fontSize: "0.88rem",
-                    cursor: "pointer",
-                    textAlign: "center",
-                  }}
-                >
-                  Sign Up
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  navigate("/login");
+                }}
+                style={{
+                  width: "100%",
+                  padding: "12px",
+                  borderRadius: "10px",
+                  background: "var(--accent-primary)",
+                  border: "none",
+                  color: "#ffffff",
+                  fontWeight: 600,
+                  fontSize: "0.92rem",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "8px",
+                  boxShadow: "0 2px 10px rgba(16, 185, 129, 0.25)",
+                  marginTop: "6px",
+                }}
+              >
+                <User size={16} />
+                <span>Log In / Sign Up</span>
+              </button>
             )}
           </nav>
         </>
