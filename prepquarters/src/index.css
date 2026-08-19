@@ -190,6 +190,27 @@ body::before {
   background-size: 100% 100%;
 }
 
+/* In Light Mode: completely disable ambient radial glow and enforce 100% pure crisp white */
+[data-theme="light"] body::before,
+body[data-theme="light"]::before,
+html[data-theme="light"] body::before,
+html[data-theme="light"]::before {
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  content: none !important;
+}
+
+[data-theme="light"] html,
+[data-theme="light"] body,
+body[data-theme="light"],
+html[data-theme="light"],
+[data-theme="light"] #root,
+[data-theme="light"] main {
+  background-color: #ffffff !important;
+  background: #ffffff !important;
+}
+
 #root {
   position: relative;
   z-index: 1;
