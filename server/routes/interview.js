@@ -344,7 +344,8 @@ router.get("/:id", protect, async (req, res) => {
 ========================================= */
 router.post("/:id/answer", protect, async (req, res) => {
   try {
-    const { candidateAnswer = "", timeSpentSeconds = 0 } = req.body;
+    const candidateAnswer = req.body.candidateAnswer || req.body.answer || "";
+    const timeSpentSeconds = Number(req.body.timeSpentSeconds || req.body.timeTakenSeconds || 0);
 
     const session = await getInterviewSession(req.params.id);
 

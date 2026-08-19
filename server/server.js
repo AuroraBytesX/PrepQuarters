@@ -22,10 +22,23 @@ app.use(securityHeaders);
 
 app.use(
   cors({
-    origin: [CLIENT_URL, "http://localhost:5173", "https://prep-quarters.vercel.app", "http://127.0.0.1:5173"],
+    origin: (origin, callback) => {
+      // Allow all origins (Vercel deployments, localhost, mobile, server-to-server)
+      callback(null, true);
+    },
     credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "x-byok-key", "x-byok-provider", "x-byok-model"],
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "x-byok-key",
+      "x-byok-provider",
+      "x-byok-model",
+      "x-ai-provider",
+      "x-ai-model",
+      "x-ai-api-key",
+      "x-requested-with",
+    ],
   })
 );
 
@@ -33,18 +46,17 @@ app.use(express.json({ limit: "5mb" }));
 app.use(express.urlencoded({ extended: true, limit: "5mb" }));
 
 /* =========================================
-   HEALTH CHECK (SAFE STATUS ONLY)
+   HEALTH & PING (ULTRA-LIGHTWEIGHT KEEP-ALIVE)
 ========================================= */
+
+app.get("/ping", (req, res) => res.status(200).send("OK"));
+app.get("/api/ping", (req, res) => res.status(200).send("OK"));
+app.get("/", (req, res) => res.status(200).send("OK"));
 
 app.get("/api/health", (req, res) => {
   res.json({
-    success: true,
     status: "healthy",
-    message: "PrepQuarters backend is active and ready.",
-    persistence: "Appwrite Cloud / Local Resilience",
     timestamp: new Date().toISOString(),
-    nimConfigured: Boolean(process.env.NVIDIA_NIM_API_KEY && process.env.NVIDIA_NIM_API_KEY.trim()),
-    groqSttConfigured: Boolean(process.env.GROQ_API_KEY && process.env.GROQ_API_KEY.trim()),
   });
 });
 

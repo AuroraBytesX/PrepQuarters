@@ -88,8 +88,8 @@ export function AiProviderModal({ isOpen, onClose, onSelectProvider }) {
     <div className="provider-modal-overlay" style={{
       position: "fixed",
       inset: 0,
-      background: "rgba(7, 10, 15, 0.8)",
-      backdropFilter: "blur(6px)",
+      background: "rgba(0, 0, 0, 0.65)",
+      backdropFilter: "blur(8px)",
       zIndex: 1000,
       display: "flex",
       alignItems: "center",
@@ -97,57 +97,59 @@ export function AiProviderModal({ isOpen, onClose, onSelectProvider }) {
       padding: "20px"
     }}>
       <div className="provider-modal-card" style={{
-        background: "var(--bg-card)",
+        background: "var(--bg-surface)",
         border: "1px solid var(--border-glass)",
         borderRadius: "16px",
         width: "100%",
         maxWidth: "580px",
         padding: "28px",
         boxShadow: "var(--shadow-dropdown)",
-        color: "var(--text-primary)"
+        color: "var(--text-primary)",
+        boxSizing: "border-box",
       }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "20px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "16px" }}>
           <div>
-            <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "var(--accent-primary)", fontSize: "0.85rem", fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "var(--accent-primary)", fontSize: "0.82rem", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase" }}>
               <Cpu size={16} />
               <span>AI Provider Mode</span>
             </div>
-            <h2 style={{ fontSize: "1.4rem", fontWeight: 700, margin: "6px 0 0", color: "var(--text-primary)" }}>
+            <h2 style={{ fontSize: "1.35rem", fontWeight: 700, margin: "6px 0 0", color: "var(--text-primary)" }}>
               Choose AI Intelligence Engine
             </h2>
           </div>
           <button
             onClick={onClose}
-            style={{ background: "none", border: "none", color: "#9ca3af", cursor: "pointer", padding: "4px" }}
+            style={{ background: "none", border: "none", color: "var(--text-secondary)", cursor: "pointer", padding: "6px", display: "flex", alignItems: "center", justifyContent: "center" }}
             aria-label="Close modal"
           >
             <X size={20} />
           </button>
         </div>
 
-        <p style={{ fontSize: "0.92rem", color: "#9ca3af", margin: "0 0 24px", lineHeight: 1.5 }}>
+        <p style={{ fontSize: "0.9rem", color: "var(--text-secondary)", margin: "0 0 20px", lineHeight: 1.5 }}>
           Select how you want AI evaluations and questioning powered during your mock interview sessions.
         </p>
 
         {/* Mode Selector */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px", marginBottom: "24px" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "20px" }}>
           <div
             onClick={() => setSelectedMode("my_api")}
             style={{
               padding: "16px",
               borderRadius: "12px",
-              border: selectedMode === "my_api" ? "2px solid #10b981" : "1px solid rgba(255,255,255,0.08)",
-              background: selectedMode === "my_api" ? "rgba(16, 185, 129, 0.08)" : "rgba(255,255,255,0.02)",
+              border: selectedMode === "my_api" ? "2px solid var(--accent-primary)" : "1px solid var(--border-medium)",
+              background: selectedMode === "my_api" ? "var(--accent-soft)" : "var(--bg-card)",
               cursor: "pointer",
-              transition: "all 0.15s ease"
+              transition: "all 0.15s ease",
+              boxSizing: "border-box",
             }}
           >
             <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
-              <Sparkles size={18} color="#10b981" />
-              <strong style={{ fontSize: "1rem", color: "#ffffff" }}>My API</strong>
+              <Sparkles size={18} color="var(--accent-primary)" />
+              <strong style={{ fontSize: "0.98rem", color: "var(--text-primary)" }}>Platform Engine</strong>
             </div>
-            <p style={{ fontSize: "0.82rem", color: "#9ca3af", margin: 0, lineHeight: 1.4 }}>
-              Platform-managed intelligence with a 40 requests/min rate limit. Zero setup required.
+            <p style={{ fontSize: "0.82rem", color: "var(--text-secondary)", margin: 0, lineHeight: 1.45 }}>
+              Platform-managed intelligence with a 40 req/min limit. Zero setup required.
             </p>
           </div>
 
@@ -156,18 +158,19 @@ export function AiProviderModal({ isOpen, onClose, onSelectProvider }) {
             style={{
               padding: "16px",
               borderRadius: "12px",
-              border: selectedMode === "byok" ? "2px solid #10b981" : "1px solid rgba(255,255,255,0.08)",
-              background: selectedMode === "byok" ? "rgba(16, 185, 129, 0.08)" : "rgba(255,255,255,0.02)",
+              border: selectedMode === "byok" ? "2px solid var(--accent-primary)" : "1px solid var(--border-medium)",
+              background: selectedMode === "byok" ? "var(--accent-soft)" : "var(--bg-card)",
               cursor: "pointer",
-              transition: "all 0.15s ease"
+              transition: "all 0.15s ease",
+              boxSizing: "border-box",
             }}
           >
             <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
-              <Key size={18} color="#10b981" />
-              <strong style={{ fontSize: "1rem", color: "#ffffff" }}>Bring Your Own Key</strong>
+              <Key size={18} color="var(--accent-primary)" />
+              <strong style={{ fontSize: "0.98rem", color: "var(--text-primary)" }}>Bring Your Own Key</strong>
             </div>
-            <p style={{ fontSize: "0.82rem", color: "#9ca3af", margin: 0, lineHeight: 1.4 }}>
-              Connect your own OpenAI, Anthropic, or xAI key. Dedicated quota, zero platform limits.
+            <p style={{ fontSize: "0.82rem", color: "var(--text-secondary)", margin: 0, lineHeight: 1.45 }}>
+              Connect your own OpenAI, Anthropic, or xAI key. Dedicated quota, zero limits.
             </p>
           </div>
         </div>
@@ -175,14 +178,14 @@ export function AiProviderModal({ isOpen, onClose, onSelectProvider }) {
         {/* BYOK Configuration Form */}
         {selectedMode === "byok" && (
           <div style={{
-            background: "rgba(0,0,0,0.25)",
-            border: "1px solid rgba(255,255,255,0.08)",
+            background: "var(--bg-secondary)",
+            border: "1px solid var(--border-medium)",
             borderRadius: "12px",
             padding: "18px",
-            marginBottom: "24px"
+            marginBottom: "20px"
           }}>
             <div style={{ marginBottom: "14px" }}>
-              <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, color: "#d1d5db", marginBottom: "6px" }}>
+              <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, color: "var(--text-primary)", marginBottom: "6px" }}>
                 Select Provider
               </label>
               <div style={{ display: "flex", gap: "8px" }}>
@@ -195,9 +198,9 @@ export function AiProviderModal({ isOpen, onClose, onSelectProvider }) {
                       flex: 1,
                       padding: "8px 12px",
                       borderRadius: "8px",
-                      border: byokProvider === p ? "1px solid #10b981" : "1px solid rgba(255,255,255,0.1)",
-                      background: byokProvider === p ? "rgba(16, 185, 129, 0.15)" : "transparent",
-                      color: byokProvider === p ? "#ffffff" : "#9ca3af",
+                      border: byokProvider === p ? "2px solid var(--accent-primary)" : "1px solid var(--border-medium)",
+                      background: byokProvider === p ? "var(--accent-soft)" : "var(--bg-surface)",
+                      color: byokProvider === p ? "var(--accent-primary)" : "var(--text-secondary)",
                       fontSize: "0.85rem",
                       fontWeight: 600,
                       cursor: "pointer",
@@ -211,11 +214,12 @@ export function AiProviderModal({ isOpen, onClose, onSelectProvider }) {
             </div>
 
             <div style={{ marginBottom: "14px" }}>
-              <label htmlFor="byok-api-key" style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, color: "#d1d5db", marginBottom: "6px" }}>
+              <label htmlFor="byok-api-key" style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, color: "var(--text-primary)", marginBottom: "6px" }}>
                 {byokProvider.toUpperCase()} API Key
               </label>
               <input
                 id="byok-api-key"
+                name="byokApiKey"
                 type="password"
                 placeholder={`sk-... (${byokProvider} secret key)`}
                 value={apiKeyInput}
@@ -223,18 +227,18 @@ export function AiProviderModal({ isOpen, onClose, onSelectProvider }) {
                 style={{
                   width: "100%",
                   padding: "10px 14px",
-                  background: "#0b0f17",
-                  border: "1px solid rgba(255,255,255,0.15)",
+                  background: "var(--bg-input)",
+                  border: "1px solid var(--border-medium)",
                   borderRadius: "8px",
-                  color: "#ffffff",
+                  color: "var(--text-primary)",
                   fontSize: "0.9rem",
                   boxSizing: "border-box"
                 }}
               />
             </div>
 
-            <div style={{ display: "flex", alignItems: "center", gap: "6px", color: "#6b7280", fontSize: "0.78rem" }}>
-              <Shield size={14} color="#10b981" />
+            <div style={{ display: "flex", alignItems: "center", gap: "6px", color: "var(--text-muted)", fontSize: "0.78rem" }}>
+              <Shield size={14} color="var(--accent-primary)" />
               <span>Keys are verified server-side and never exposed in browser network logs.</span>
             </div>
 
@@ -247,9 +251,9 @@ export function AiProviderModal({ isOpen, onClose, onSelectProvider }) {
                 display: "flex",
                 alignItems: "center",
                 gap: "8px",
-                background: verifyStatus.success ? "rgba(16, 185, 129, 0.1)" : "rgba(239, 68, 68, 0.1)",
-                color: verifyStatus.success ? "#34d399" : "#f87171",
-                border: verifyStatus.success ? "1px solid rgba(16, 185, 129, 0.25)" : "1px solid rgba(239, 68, 68, 0.25)"
+                background: verifyStatus.success ? "var(--accent-soft)" : "rgba(239, 68, 68, 0.1)",
+                color: verifyStatus.success ? "var(--accent-primary)" : "#ef4444",
+                border: verifyStatus.success ? "1px solid var(--accent-border)" : "1px solid rgba(239, 68, 68, 0.3)"
               }}>
                 {verifyStatus.success ? <CheckCircle size={15} /> : <AlertCircle size={15} />}
                 <span>{verifyStatus.message}</span>
@@ -266,9 +270,9 @@ export function AiProviderModal({ isOpen, onClose, onSelectProvider }) {
             style={{
               padding: "10px 16px",
               background: "transparent",
-              border: "1px solid rgba(255,255,255,0.12)",
+              border: "1px solid var(--border-medium)",
               borderRadius: "8px",
-              color: "#d1d5db",
+              color: "var(--text-secondary)",
               fontSize: "0.9rem",
               fontWeight: 500,
               cursor: "pointer"
@@ -283,7 +287,7 @@ export function AiProviderModal({ isOpen, onClose, onSelectProvider }) {
               onClick={handleSaveMyApi}
               style={{
                 padding: "10px 20px",
-                background: "#10b981",
+                background: "var(--accent-primary)",
                 border: "none",
                 borderRadius: "8px",
                 color: "#ffffff",
@@ -305,7 +309,7 @@ export function AiProviderModal({ isOpen, onClose, onSelectProvider }) {
               disabled={verifying}
               style={{
                 padding: "10px 20px",
-                background: "#10b981",
+                background: "var(--accent-primary)",
                 border: "none",
                 borderRadius: "8px",
                 color: "#ffffff",

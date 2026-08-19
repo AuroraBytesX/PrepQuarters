@@ -83,7 +83,17 @@ async function callAiChatCompletion({
   options = {},
   providerConfig = {},
   userIdentifier = "anonymous_client",
+  jsonMode,
+  temperature,
+  max_tokens,
+  maxTokens,
 }) {
+  const mergedOptions = {
+    jsonMode: typeof options.jsonMode === "boolean" ? options.jsonMode : (typeof jsonMode === "boolean" ? jsonMode : true),
+    temperature: typeof options.temperature === "number" ? options.temperature : (typeof temperature === "number" ? temperature : 0.3),
+    max_tokens: typeof options.max_tokens === "number" ? options.max_tokens : (typeof max_tokens === "number" ? max_tokens : (typeof maxTokens === "number" ? maxTokens : 1500)),
+    ...options,
+  };
   const mode = providerConfig.mode === "byok" ? "byok" : "my_api";
   const provider = (providerConfig.provider || (mode === "byok" ? "openai" : "platform")).toLowerCase();
   const requestedModel = providerConfig.model || "default";
@@ -143,6 +153,42 @@ async function callAiChatCompletion({
    PROVIDER HANDLERS
 ======================================================================= */
 
+function extractJsonFromText(rawText) {
+  if (!rawText || typeof rawText !== "string") return null;
+  // 1. Direct parse
+  try {
+    return JSON.parse(rawText.trim());
+  } catch (e) {}
+
+  // 2. Strip code fences
+  try {
+    const cleaned = rawText.replace(/```json/gi, "").replace(/```/g, "").trim();
+    return JSON.parse(cleaned);
+  } catch (e) {}
+
+  // 3. Extract JSON object substring between { and }
+  const firstBrace = rawText.indexOf("{");
+  const lastBrace = rawText.lastIndexOf("}");
+  if (firstBrace !== -1 && lastBrace > firstBrace) {
+    try {
+      const jsonCandidate = rawText.substring(firstBrace, lastBrace + 1);
+      return JSON.parse(jsonCandidate);
+    } catch (e) {}
+  }
+
+  // 4. Extract JSON array substring between [ and ]
+  const firstBracket = rawText.indexOf("[");
+  const lastBracket = rawText.lastIndexOf("]");
+  if (firstBracket !== -1 && lastBracket > firstBracket) {
+    try {
+      const jsonCandidate = rawText.substring(firstBracket, lastBracket + 1);
+      return JSON.parse(jsonCandidate);
+    } catch (e) {}
+  }
+
+  return null;
+}
+
 async function callPlatformNimApi(messages, options, model) {
   const nimKey = process.env.NVIDIA_NIM_API_KEY;
   const groqKey = process.env.GROQ_API_KEY;
@@ -155,7 +201,7 @@ async function callPlatformNimApi(messages, options, model) {
     if (groqKey && groqKey.trim()) {
       apiKey = groqKey.trim();
       baseUrl = "https://api.groq.com/openai/v1";
-      resolvedModel = "llama-3.3-70b-versatile";
+      resolvedModel = "openai/gpt-oss-20b";
     } else {
       return {
         success: false,
@@ -174,48 +220,56 @@ async function callPlatformNimApi(messages, options, model) {
     max_tokens: typeof options.max_tokens === "number" ? options.max_tokens : 1500,
   };
 
-  if (options.jsonMode) {
+  if (options.jsonMode && !baseUrl.includes("groq.com")) {
     payload.response_format = { type: "json_object" };
   }
 
-  const response = await fetch(`${baseUrl}/chat/completions`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${apiKey.trim()}`,
-    },
-    body: JSON.stringify(payload),
-  });
+  try {
+    const response = await fetch(`${baseUrl}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey.trim()}`,
+      },
+      body: JSON.stringify(payload),
+    });
 
-  if (!response.ok) {
-    const errorText = await response.text();
+    if (!response.ok) {
+      const errorText = await response.text();
+      // If NVIDIA NIM fails, try Groq fallback automatically
+      if (baseUrl.includes("nvidia.com") && groqKey && groqKey.trim()) {
+        console.warn("[NVIDIA_NIM_FALLBACK_TO_GROQ] Switching to Groq openai/gpt-oss-120b");
+        return await callPlatformNimApi(messages, options, "openai/gpt-oss-120b");
+      }
+      return {
+        success: false,
+        error: `Platform provider responded with HTTP ${response.status}: ${cleanDisallowedChars(errorText)}`,
+        provider: "platform",
+        model: resolvedModel,
+      };
+    }
+
+    const data = await response.json();
+    const rawText = data.choices?.[0]?.message?.content || "";
+    const json = options.jsonMode ? extractJsonFromText(rawText) : null;
+
+    return {
+      success: true,
+      text: cleanDisallowedChars(rawText),
+      json,
+      raw: data,
+      provider: "platform",
+      model: resolvedModel,
+    };
+  } catch (netErr) {
+    console.error("[PLATFORM_INFERENCE_NETWORK_ERROR]", netErr.message);
     return {
       success: false,
-      error: `Platform provider responded with HTTP ${response.status}: ${cleanDisallowedChars(errorText)}`,
+      error: `Inference network failure: ${netErr.message}`,
       provider: "platform",
-      model,
+      model: resolvedModel,
     };
   }
-
-  const data = await response.json();
-  const rawText = data.choices?.[0]?.message?.content || "";
-  let json = null;
-
-  if (options.jsonMode && rawText) {
-    try {
-      json = JSON.parse(rawText.replace(/```json/gi, "").replace(/```/g, "").trim());
-    } catch (e) {
-      // Fallback parser if JSON was slightly formatted
-    }
-  }
-
-  return {
-    success: true,
-    text: cleanDisallowedChars(rawText),
-    json,
-    provider: "platform",
-    model,
-  };
 }
 
 async function callOpenAiApi(messages, options, apiKey, model) {

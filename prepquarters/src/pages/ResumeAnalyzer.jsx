@@ -178,14 +178,26 @@ function ResumeAnalyzer() {
     setIsAiThinking(true);
 
     try {
+      const byokKey = sessionStorage.getItem("prepquarters_byok_key") || "";
+      const byokProvider = localStorage.getItem("prepquarters_byok_provider") || "openai";
+      const token = localStorage.getItem("prepquartersToken") || "";
+
+      const headers = { "Content-Type": "application/json" };
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+      if (byokKey) {
+        headers["x-byok-key"] = byokKey;
+        headers["x-byok-provider"] = byokProvider;
+      }
+
       const res = await fetch(`${API_BASE_URL}/api/resume/builder/chat`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({
           currentResume: builtResume,
           message: confirmGenerate ? "generate final resume" : text.trim(),
           step: builderStep,
           userConfirmed: confirmGenerate,
+          conversationHistory: chatMessages.slice(-8),
         }),
       });
 
@@ -196,11 +208,16 @@ function ResumeAnalyzer() {
         if (data.nextStep) setBuilderStep(data.nextStep);
         if (typeof data.confirmationPending === "boolean") setConfirmationPending(data.confirmationPending);
         if (data.latex) setLatexCode(data.latex);
+      } else {
+        setChatMessages((prev) => [
+          ...prev,
+          { sender: "ai", text: data.message || "I encountered an issue processing that. Could you please rephrase or try again?" },
+        ]);
       }
     } catch (e) {
       setChatMessages((prev) => [
         ...prev,
-        { sender: "ai", text: "I encountered an issue updating your resume state. Please try again." },
+        { sender: "ai", text: "Connecting to the AI Architect. If the backend is waking up, please give it a moment and send again." },
       ]);
     } finally {
       setIsAiThinking(false);
@@ -210,9 +227,13 @@ function ResumeAnalyzer() {
   const handleCompileLatex = async () => {
     setGeneratingLatex(true);
     try {
+      const token = localStorage.getItem("prepquartersToken") || "";
+      const headers = { "Content-Type": "application/json" };
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+
       const res = await fetch(`${API_BASE_URL}/api/resume/generate-latex`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({ resumeData: builtResume }),
       });
       const data = await res.json();

@@ -29,28 +29,29 @@ function getSmtpTransporter() {
 
   const cleanUser = process.env.SMTP_USER.trim();
   const cleanPass = process.env.SMTP_PASS.replace(/\s+/g, ""); // Strip all spaces from app passwords
-  const host = process.env.SMTP_HOST || (cleanUser.includes("@gmail.com") ? "smtp.gmail.com" : "localhost");
-  const port = Number(process.env.SMTP_PORT) || 465;
-  const secure = process.env.SMTP_SECURE === "true" || port === 465;
+  const isGmail = cleanUser.includes("@gmail.com");
 
   return nodemailer.createTransport({
-    host,
-    port,
-    secure,
+    host: isGmail ? "smtp.gmail.com" : (process.env.SMTP_HOST || "localhost"),
+    port: isGmail ? 587 : (Number(process.env.SMTP_PORT) || 587),
+    secure: false,
+    requireTLS: true,
     auth: {
       user: cleanUser,
       pass: cleanPass,
     },
-    pool: true,
-    maxConnections: 3,
-    maxMessages: 100,
     connectionTimeout: 8000,
     greetingTimeout: 8000,
     socketTimeout: 10000,
-    tls: {
-      rejectUnauthorized: false,
-    },
   });
+}
+
+// Helper to enforce hard execution timeout on asynchronous email dispatches
+function withTimeout(promise, timeoutMs = 8000, errorMsg = "Email delivery timed out.") {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error(errorMsg)), timeoutMs)),
+  ]);
 }
 
 /**
@@ -134,21 +135,25 @@ GitHub: https://github.com/AuroraBytesX/PrepQuarters
   // 1. Check for Resend API Key
   if (process.env.RESEND_API_KEY && process.env.RESEND_API_KEY.trim()) {
     try {
-      const resendRes = await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${process.env.RESEND_API_KEY.trim()}`,
-        },
-        body: JSON.stringify({
-          from: process.env.CONTACT_FROM_EMAIL || "PrepQuarters <onboarding@resend.dev>",
-          to: [recipient],
-          reply_to: cleanEmail,
-          subject,
-          text: textContent,
-          html: htmlContent,
+      const resendRes = await withTimeout(
+        fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${process.env.RESEND_API_KEY.trim()}`,
+          },
+          body: JSON.stringify({
+            from: process.env.CONTACT_FROM_EMAIL || "PrepQuarters <onboarding@resend.dev>",
+            to: [recipient],
+            reply_to: cleanEmail,
+            subject,
+            text: textContent,
+            html: htmlContent,
+          }),
         }),
-      });
+        6000,
+        "Resend API dispatch timeout"
+      );
 
       const resendData = await resendRes.json();
       if (resendRes.ok) {
@@ -163,7 +168,7 @@ GitHub: https://github.com/AuroraBytesX/PrepQuarters
         };
       }
     } catch (err) {
-      console.error(`[EMAIL_DELIVERY_ERROR] Resend API fetch failed:`, err.message);
+      console.error(`[EMAIL_DELIVERY_ERROR] Resend API failed:`, err.message);
     }
   }
 
@@ -172,14 +177,18 @@ GitHub: https://github.com/AuroraBytesX/PrepQuarters
   if (transporter) {
     try {
       const cleanUser = process.env.SMTP_USER.trim();
-      const info = await transporter.sendMail({
-        from: `"${cleanName} via PrepQuarters" <${cleanUser}>`,
-        to: recipient,
-        replyTo: cleanEmail,
-        subject,
-        text: textContent,
-        html: htmlContent,
-      });
+      const info = await withTimeout(
+        transporter.sendMail({
+          from: `"${cleanName} via PrepQuarters" <${cleanUser}>`,
+          to: recipient,
+          replyTo: cleanEmail,
+          subject,
+          text: textContent,
+          html: htmlContent,
+        }),
+        7000,
+        "SMTP server connection timeout"
+      );
 
       console.log(`[EMAIL_DELIVERY_SUCCESS] Dispatched via SMTP to ${recipient} (MessageID: ${info.messageId})`);
       return {
@@ -196,14 +205,14 @@ GitHub: https://github.com/AuroraBytesX/PrepQuarters
         success: false,
         delivered: false,
         error: err.message,
-        message: "Email delivery failed to connect to SMTP provider.",
+        message: `Email delivery failed: ${err.message}. Direct contact: ${recipient}`,
       };
     }
   }
 
   console.warn(
-    `[EMAIL_CONFIG_NOTICE] EMAIL DELIVERY BLOCKED - MISSING ENVIRONMENT VARIABLE: Requires SMTP_USER & SMTP_PASS or RESEND_API_KEY in server/.env.\n` +
-    `[CONTACT_SUBMISSION_RECORDED] From: ${cleanName} <${cleanEmail}> -> To: ${recipient} | Length: ${cleanMessage.length} chars`
+    `[EMAIL_CONFIG_NOTICE] Requires SMTP_USER & SMTP_PASS in environment.\n` +
+    `[CONTACT_SUBMISSION_RECORDED] From: ${cleanName} <${cleanEmail}> -> To: ${recipient}`
   );
 
   return {
@@ -211,19 +220,18 @@ GitHub: https://github.com/AuroraBytesX/PrepQuarters
     delivered: false,
     configured: false,
     recipient,
-    error: "EMAIL DELIVERY BLOCKED - MISSING ENVIRONMENT VARIABLE",
-    missingConfig: ["SMTP_USER", "SMTP_PASS", "RESEND_API_KEY"],
-    message: "Email delivery blocked: Missing SMTP_USER and SMTP_PASS or RESEND_API_KEY in server configuration.",
+    error: "SMTP provider not configured on server.",
+    message: `Inquiry recorded. Server email dispatch is pending SMTP credentials. Reach us directly at ${recipient}.`,
   };
 }
 
 /**
  * Sends a 6-digit password reset verification code to the user's email.
  */
-async function sendPasswordResetEmail({ email = "", name = "Candidate", resetCode = "" }) {
+async function sendPasswordResetEmail({ email = "", name = "Candidate", resetCode = "", code = "" }) {
   const cleanEmail = String(email).trim().toLowerCase();
   const cleanName = cleanDisallowedChars(String(name).trim() || "Candidate");
-  const cleanCode = String(resetCode).trim();
+  const cleanCode = String(resetCode || code || "").trim();
   const timestamp = new Date().toUTCString();
 
   if (!isValidEmail(cleanEmail) || !cleanCode) {
@@ -291,20 +299,24 @@ Security & Support: https://github.com/AuroraBytesX/PrepQuarters
   // 1. Resend API Transport
   if (process.env.RESEND_API_KEY && process.env.RESEND_API_KEY.trim()) {
     try {
-      const resendRes = await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${process.env.RESEND_API_KEY.trim()}`,
-        },
-        body: JSON.stringify({
-          from: process.env.CONTACT_FROM_EMAIL || "PrepQuarters Security <security@resend.dev>",
-          to: [cleanEmail],
-          subject,
-          text: textContent,
-          html: htmlContent,
+      const resendRes = await withTimeout(
+        fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${process.env.RESEND_API_KEY.trim()}`,
+          },
+          body: JSON.stringify({
+            from: process.env.CONTACT_FROM_EMAIL || "PrepQuarters Security <security@resend.dev>",
+            to: [cleanEmail],
+            subject,
+            text: textContent,
+            html: htmlContent,
+          }),
         }),
-      });
+        6000,
+        "Resend API dispatch timeout"
+      );
 
       const resendData = await resendRes.json();
       if (resendRes.ok) {
@@ -321,13 +333,17 @@ Security & Support: https://github.com/AuroraBytesX/PrepQuarters
   if (transporter) {
     try {
       const cleanUser = process.env.SMTP_USER.trim();
-      const info = await transporter.sendMail({
-        from: `"PrepQuarters Security" <${cleanUser}>`,
-        to: cleanEmail,
-        subject,
-        text: textContent,
-        html: htmlContent,
-      });
+      const info = await withTimeout(
+        transporter.sendMail({
+          from: `"PrepQuarters Security" <${cleanUser}>`,
+          to: cleanEmail,
+          subject,
+          text: textContent,
+          html: htmlContent,
+        }),
+        7000,
+        "SMTP server connection timeout"
+      );
 
       console.log(`[RESET_EMAIL_SUCCESS] Verification code dispatched via SMTP to ${cleanEmail} (ID: ${info.messageId})`);
       return { success: true, delivered: true, provider: "smtp", messageId: info.messageId };

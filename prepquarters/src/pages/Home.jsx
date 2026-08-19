@@ -73,16 +73,21 @@ function Home() {
     setSubmittingContact(true);
     setContactStatus(null);
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 9000);
+
     try {
       const res = await fetch(`${API_BASE_URL}/api/system/contact`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
         body: JSON.stringify({
           name: nameInput.trim(),
           email: emailInput.trim(),
           message: messageInput.trim(),
         }),
       });
+      clearTimeout(timeoutId);
       const data = await res.json();
       if (res.ok && data.success) {
         setContactStatus({ success: true, message: data.message || "Message sent successfully to support." });
@@ -90,10 +95,15 @@ function Home() {
         setEmailInput("");
         setMessageInput("");
       } else {
-        setContactStatus({ success: false, message: data.message || "Unable to send message. Please try again." });
+        setContactStatus({ success: false, message: data.message || "Unable to send message. Please reach us at tapashidhar2004@gmail.com." });
       }
     } catch (err) {
-      setContactStatus({ success: false, message: "Could not connect to contact service." });
+      clearTimeout(timeoutId);
+      if (err.name === "AbortError") {
+        setContactStatus({ success: false, message: "Request timed out. Please contact support directly at tapashidhar2004@gmail.com." });
+      } else {
+        setContactStatus({ success: false, message: "Could not reach email service. Direct contact: tapashidhar2004@gmail.com." });
+      }
     } finally {
       setSubmittingContact(false);
     }

@@ -140,16 +140,16 @@ async function validateResumeDocument({ resumeText = "", targetRole = "Software 
     };
   }
 
-  // 2. Character repetition & keyboard smash checks
-  const hasExtremeCharRepeat = /(.)\1{4,}/.test(cleanResume);
+  // 2. Character repetition & keyboard smash checks (alphanumeric only, ignore spaces/dashes/newlines)
+  const hasExtremeCharRepeat = /([a-zA-Z0-9])\1{5,}/.test(cleanResume);
   const isKeyboardMash = /^[asdfghjklqwertyuiopzxcvbnm\s\d.,!?-]+$/i.test(cleanResume) &&
     words.length > 4 &&
-    words.every(w => /^[asdfghjklqwertyuiopzxcvbnm]{4,}$/i.test(w) && !["react", "python", "golang", "rust", "javascript", "docker", "developer", "engineer", "project", "university"].includes(w.toLowerCase()));
+    words.every(w => /^[asdfghjklqwertyuiopzxcvbnm]{6,}$/i.test(w) && !["react", "python", "golang", "rust", "javascript", "docker", "developer", "engineer", "project", "university", "experience", "education"].includes(w.toLowerCase()));
 
   const uniqueWords = new Set(words.map(w => w.toLowerCase()));
   const uniqueRatio = uniqueWords.size / words.length;
 
-  if (hasExtremeCharRepeat || isKeyboardMash || (words.length >= 10 && uniqueRatio < 0.25)) {
+  if (hasExtremeCharRepeat || isKeyboardMash || (words.length >= 25 && uniqueRatio < 0.2)) {
     return {
       isValid: false,
       reason: "Detected repetitive characters, keyboard smash, or meaningless filler text.",
@@ -651,11 +651,19 @@ function validateCandidateInput({ step, message, currentGraph = {} }) {
 
 /**
  * Interactive Conversational Resume Builder Assistant
- * Maintains structured graph state without placeholders, asks clarifying questions,
- * supports bidirectional editing, and confirms before compiling final LaTeX.
+ * Powered by LLM semantic intent classification, dynamic context validation,
+ * bidirectional editing, and pre-generation confirmation.
  */
-function processResumeBuilderMessage({ currentGraph = {}, message = "", userMessage = "", step = "start", userConfirmed = false, conversationHistory = [] }) {
-  const cleanMsg = (message || userMessage || "").trim();
+async function processResumeBuilderMessage({
+  currentGraph = {},
+  message = "",
+  userMessage = "",
+  step = "start",
+  userConfirmed = false,
+  conversationHistory = [],
+  providerConfig = {},
+}) {
+  const cleanMsg = cleanDisallowedChars(message || userMessage || "").trim();
   const graph = {
     name: currentGraph.name || currentGraph.fullName || "",
     fullName: currentGraph.fullName || currentGraph.name || "",
@@ -666,7 +674,7 @@ function processResumeBuilderMessage({ currentGraph = {}, message = "", userMess
     summary: currentGraph.summary || "",
     skills: Array.isArray(currentGraph.skills)
       ? [...currentGraph.skills]
-      : (currentGraph.skills?.languages ? [...currentGraph.skills.languages] : ["JavaScript", "Python", "SQL"]),
+      : (currentGraph.skills?.languages ? [...currentGraph.skills.languages] : []),
     experience: Array.isArray(currentGraph.experience) ? [...currentGraph.experience] : [],
     projects: Array.isArray(currentGraph.projects) ? [...currentGraph.projects] : [],
     education: Array.isArray(currentGraph.education) ? [...currentGraph.education] : [],
@@ -678,7 +686,7 @@ function processResumeBuilderMessage({ currentGraph = {}, message = "", userMess
     if (typeof graph.skills === "object") {
       graph.skills = Object.values(graph.skills).flat();
     } else {
-      graph.skills = ["JavaScript", "Python", "SQL"];
+      graph.skills = [];
     }
   }
 
@@ -696,7 +704,7 @@ function processResumeBuilderMessage({ currentGraph = {}, message = "", userMess
     latex,
   });
 
-  // 1. Check for confirmation to generate final resume
+  // 1. Check for explicit confirmation to generate final resume
   if (userConfirmed || lower === "generate final resume" || (step === "confirmation" && (lower === "no" || lower === "no edits" || lower === "generate" || lower === "looks good" || lower === "yes generate" || lower.includes("compile")))) {
     const latexCode = generateCleanLatexFromGraph(graph);
     return {
@@ -711,77 +719,6 @@ function processResumeBuilderMessage({ currentGraph = {}, message = "", userMess
     };
   }
 
-  // 2. Handle Bidirectional Editing commands
-  if (lower.startsWith("change ") || lower.startsWith("remove ") || lower.startsWith("edit ") || lower.startsWith("rewrite ") || lower.startsWith("update ") || lower.includes("actually, change") || lower.includes("change my") || lower.includes("update my")) {
-    if (lower.includes("role") || lower.includes("target")) {
-      const newRoleMatch = cleanMsg.match(/(?:to|role\s+to|target\s+role\s+to)\s+([A-Za-z\s]+(?:Engineer|Developer|Architect|Specialist|Manager|Scientist))/i);
-      const newRole = newRoleMatch ? newRoleMatch[1].trim() : cleanMsg.replace(/^(actually,?\s*)?(change|edit|update|rewrite)\s+(my\s+)?(target\s+)?(role\s+to\s+|role\s+)?/i, "").split(/and/i)[0].trim();
-      if (newRole) {
-        graph.targetRole = newRole;
-      }
-    } else if (lower.includes("skill") || lower.includes("tech") || lower.includes("add ") || lower.includes("go") || lower.includes("rust")) {
-      const skillsToAdd = cleanMsg.split(/,|and/i).map((s) => s.replace(/^(actually,?\s*)?(add|include|skills?|technolog(y|ies)|to\s+my\s+skills)\s+/i, "").trim()).filter((s) => s.length > 1 && !s.toLowerCase().includes("change") && !s.toLowerCase().includes("role"));
-      if (skillsToAdd.length > 0) {
-        graph.skills = Array.from(new Set([...graph.skills, ...skillsToAdd]));
-      }
-    } else if (lower.includes("project")) {
-      const projDesc = cleanMsg.replace(/^(actually,?\s*)?(change|edit|update|rewrite)\s+(my\s+)?(project\s+description\s+to\s+|project\s+to\s+)?/i, "").trim();
-      if (projDesc) {
-        if (graph.projects.length > 0) {
-          graph.projects[0].bullets = [projDesc];
-        } else {
-          graph.projects.push({ name: "Core Engineering Project", tech: graph.skills?.slice(0, 3).join(", ") || "Technical Stack", bullets: [projDesc] });
-        }
-      }
-    } else if (lower.includes("summary")) {
-      const summaryText = cleanMsg.replace(/^(actually,?\s*)?(change|edit|update|rewrite)\s+(my\s+)?(summary\s+to\s+|summary\s+)?/i, "").trim();
-      if (summaryText) graph.summary = summaryText;
-    } else if (lower.includes("experience")) {
-      const expText = cleanMsg.replace(/^(actually,?\s*)?(change|edit|update|rewrite)\s+(my\s+)?(experience\s+to\s+|experience\s+)?/i, "").trim();
-      if (expText) {
-        if (graph.experience.length > 0) {
-          graph.experience[0].bullets = [expText];
-        } else {
-          graph.experience.push({ title: graph.targetRole || "Software Engineer", company: "Engineering Team", bullets: [expText] });
-        }
-      }
-    }
-
-    return makeReturn({
-      nextStep: "confirmation",
-      confirmationPending: true,
-      text: `I have updated your resume section. Here is your updated overview:\n- Role: ${graph.targetRole}\n- Name: ${graph.name || "Candidate"}\n- Skills: ${graph.skills.join(", ")}\n\nWould you like to change anything before I generate the resume?`,
-    });
-  }
-
-  // 3. Review Stage Handler
-  if (step === "review" || lower.includes("done adding") || lower.includes("done with details") || lower === "review") {
-    if (!graph.summary && graph.targetRole) {
-      graph.summary = `${graph.targetRole} with proven engineering experience building scalable, high-performance software systems.`;
-    }
-    const summaryReview = `Here is a summary of your structured resume details:\n` +
-      `- Target Role: ${graph.targetRole || "Software Engineer"}\n` +
-      `- Name: ${graph.name || "Engineering Candidate"}${graph.email ? ` (${graph.email})` : ""}\n` +
-      `- Summary: ${graph.summary}\n` +
-      `- Experience: ${graph.experience[0]?.title || graph.targetRole} at ${graph.experience[0]?.company || "Engineering Team"}\n` +
-      `- Skills: ${graph.skills.join(", ")}\n\n` +
-      `Would you like to change anything before I generate the resume?`;
-
-    return makeReturn({
-      nextStep: "confirmation",
-      confirmationPending: true,
-      text: summaryReview,
-    });
-  }
-
-  if (lower === "yes" && step === "confirmation") {
-    return makeReturn({
-      nextStep: "review_edit",
-      confirmationPending: false,
-      text: "What section would you like to update (e.g., 'Change my target role to Staff SRE', 'Add Docker to skills', or 'Change my project description')?",
-    });
-  }
-
   // 0. Handle initial greeting or start command
   if (step === "start" || !cleanMsg || lower === "start" || lower === "hi" || lower === "hello") {
     return makeReturn({
@@ -791,7 +728,153 @@ function processResumeBuilderMessage({ currentGraph = {}, message = "", userMess
     });
   }
 
-  // 4. Validate user input for current step (Gibberish & Context Check)
+  // 2. Perform Deep Semantic LLM Analysis when AI Provider is Active
+  if (isAiConfigured()) {
+    try {
+      const historyFormatted = Array.isArray(conversationHistory) && conversationHistory.length > 0
+        ? conversationHistory.slice(-8).map(m => `${m.sender === "user" ? "Candidate" : "Architect"}: "${m.text}"`).join("\n")
+        : "No prior messages in this session.";
+
+      const aiSystemPrompt = `You are the PrepQuarters AI Resume Architect — a warm, brilliant, and highly encouraging technical career mentor (like ChatGPT meets a Principal Staff Engineer).
+
+YOUR MISSION:
+Help the candidate craft a stellar, senior-level ATS LaTeX resume through an intelligent, natural, and fluid conversation.
+
+CURRENT RESUME GRAPH:
+- Target Role: "${graph.targetRole || "Not yet specified"}"
+- Full Name & Contact: "${graph.name || "Not specified"}" (${graph.email || "No email"}, ${graph.location || "No location"})
+- Summary: "${graph.summary || "Not specified"}"
+- Skills: ${JSON.stringify(graph.skills || [])}
+- Work Experience: ${JSON.stringify(graph.experience || [])}
+- Projects: ${JSON.stringify(graph.projects || [])}
+- Education: ${JSON.stringify(graph.education || [])}
+
+CURRENT RESUME SECTION BEING COVERED: "${step}"
+
+RECENT CONVERSATION HISTORY:
+${historyFormatted}
+
+CANDIDATE'S LATEST MESSAGE: "${cleanMsg}"
+
+CONVERSATION & ARCHITECT GUIDELINES:
+1. TALK NATURALLY LIKE CHATGPT:
+   - Be genuinely helpful, conversational, and encouraging. Never sound like a robotic questionnaire or repeat the exact same sentence.
+   - If the candidate asks a question (about interview prep, tech trends, ATS formatting, or casual chat), answer it with insight and warmth!
+   - If the candidate is stubborn, vague, or says "I don't know" / "you suggest something" / "help me write it":
+     -> PROACTIVELY draft 2-3 tailored, realistic technical suggestions for them right in your response!
+     -> For example, if they don't know their summary or skills, draft a great one and ask: "Here is a strong summary tailored for you: '...'. Would you like to use this, or would you like to tweak anything?"
+   - If the candidate agrees ("yes use that", "sounds good", "option 1", "add those"), extract it into the resume and smoothly transition to the next section!
+   - If the candidate asks to edit or change anything at any time ("Actually change my role to SRE", "add Docker"), happily update it!
+
+2. ACCURATE RESUME DATA EXTRACTION:
+   - Extract valid details (targetRole, name, email, location, summary, skills, experience, project, education) when provided or confirmed by the candidate.
+   - Do not store user questions or conversational filler as resume data.
+
+3. RESUME SECTION PROGRESSION:
+   - Natural progression: Target Role -> Name & Contact -> Professional Summary -> Work Experience -> Tech Stack / Skills -> Projects -> Education -> Confirmation.
+   - Once all sections are populated, present a clean structured review and ask if they are ready to compile their LaTeX resume.
+
+Output strict JSON matching this schema:
+{
+  "assistantResponse": "Warm, engaging, conversational response with thoughtful answers or proactive drafts",
+  "extractedData": {
+    "targetRole": "Role title or null",
+    "name": "Full name or null",
+    "email": "Email or null",
+    "location": "Location or null",
+    "summary": "Summary string or null",
+    "skills": ["Skill1", "Skill2"] or null,
+    "experience": { "title": "...", "company": "...", "bullets": ["..."] } or null,
+    "project": { "name": "...", "tech": "...", "bullets": ["..."] } or null,
+    "education": { "degree": "...", "institution": "..." } or null
+  },
+  "nextStep": "role" | "name_contact" | "summary" | "experience" | "skills" | "projects" | "education" | "confirmation",
+  "confirmationPending": true | false
+}`;
+
+      const aiResult = await callAiChatCompletion({
+        messages: [
+          { role: "system", content: aiSystemPrompt },
+          { role: "user", content: cleanMsg },
+        ],
+        options: {
+          temperature: 0.3,
+          max_tokens: 900,
+          jsonMode: true,
+        },
+        providerConfig,
+      });
+
+      if (aiResult.success && aiResult.json && aiResult.json.assistantResponse) {
+        const payload = aiResult.json;
+        if (payload.extractedData) {
+          if (payload.extractedData.targetRole) {
+            graph.targetRole = payload.extractedData.targetRole;
+          }
+          if (payload.extractedData.name) {
+            graph.name = payload.extractedData.name;
+            graph.fullName = graph.name;
+          }
+          if (payload.extractedData.email) graph.email = payload.extractedData.email;
+          if (payload.extractedData.location) graph.location = payload.extractedData.location;
+          if (payload.extractedData.summary) {
+            graph.summary = payload.extractedData.summary;
+          }
+          if (Array.isArray(payload.extractedData.skills) && payload.extractedData.skills.length > 0) {
+            graph.skills = Array.from(new Set([...(graph.skills || []), ...payload.extractedData.skills]));
+          }
+          if (payload.extractedData.experience && payload.extractedData.experience.title) {
+            graph.experience.push(payload.extractedData.experience);
+          }
+          if (payload.extractedData.project && payload.extractedData.project.name) {
+            graph.projects.push(payload.extractedData.project);
+          }
+          if (payload.extractedData.education && payload.extractedData.education.degree) {
+            graph.education.push(payload.extractedData.education);
+          }
+        }
+
+        const nextStep = payload.nextStep || step;
+        const isConfirm = Boolean(payload.confirmationPending || nextStep === "confirmation");
+
+        return makeReturn({
+          nextStep,
+          confirmationPending: isConfirm,
+          text: payload.assistantResponse,
+        });
+      } else {
+        console.warn("[RESUME_BUILDER_AI_RESULT_FAILED]", aiResult.error || "Missing json/assistantResponse", "Raw text:", aiResult.text?.substring(0, 100));
+      }
+    } catch (llmErr) {
+      console.warn("[RESUME_BUILDER_LLM_FALLBACK]", llmErr.message);
+    }
+  }
+
+  // 3. Deterministic Semantic Rule Engine (Offline / Instant Fallback)
+  // Handle Bidirectional Editing commands
+  if (lower.startsWith("change ") || lower.startsWith("remove ") || lower.startsWith("edit ") || lower.startsWith("rewrite ") || lower.startsWith("update ") || lower.includes("actually, change") || lower.includes("change my") || lower.includes("update my")) {
+    if (lower.includes("role") || lower.includes("target")) {
+      const newRoleMatch = cleanMsg.match(/(?:to|role\s+to|target\s+role\s+to)\s+([A-Za-z\s]+(?:Engineer|Developer|Architect|Specialist|Manager|Scientist))/i);
+      const newRole = newRoleMatch ? newRoleMatch[1].trim() : cleanMsg.replace(/^(actually,?\s*)?(change|edit|update|rewrite)\s+(my\s+)?(target\s+)?(role\s+to\s+|role\s+)?/i, "").split(/and/i)[0].trim();
+      if (newRole) graph.targetRole = newRole;
+    } else if (lower.includes("skill") || lower.includes("tech") || lower.includes("add ")) {
+      const skillsToAdd = cleanMsg.split(/,|and/i).map((s) => s.replace(/^(actually,?\s*)?(add|include|skills?|technolog(y|ies)|to\s+my\s+skills)\s+/i, "").trim()).filter((s) => s.length > 1 && !s.toLowerCase().includes("change") && !s.toLowerCase().includes("role"));
+      if (skillsToAdd.length > 0) {
+        graph.skills = Array.from(new Set([...graph.skills, ...skillsToAdd]));
+      }
+    } else if (lower.includes("summary")) {
+      const summaryText = cleanMsg.replace(/^(actually,?\s*)?(change|edit|update|rewrite)\s+(my\s+)?(summary\s+to\s+|summary\s+)?/i, "").trim();
+      if (summaryText) graph.summary = summaryText;
+    }
+
+    return makeReturn({
+      nextStep: "confirmation",
+      confirmationPending: true,
+      text: `I have updated your resume details:\n- Role: ${graph.targetRole || "Software Engineer"}\n- Skills: ${(graph.skills || []).join(", ") || "Standard Stack"}\n\nWould you like to change anything else before I generate your LaTeX resume?`,
+    });
+  }
+
+  // Validate input for current step
   const validation = validateCandidateInput({ step, message: cleanMsg, currentGraph: graph });
   if (!validation.valid) {
     return makeReturn({
@@ -801,20 +884,7 @@ function processResumeBuilderMessage({ currentGraph = {}, message = "", userMess
     });
   }
 
-  // 5. Natural language extraction for name and target role
-  if (lower.includes("name is ") || lower.includes("i am ") || lower.includes("targeting ")) {
-    const nameMatch = cleanMsg.match(/(?:my name is|i am|name:?)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/i);
-    if (nameMatch && nameMatch[1] && !nameMatch[1].toLowerCase().includes("targeting") && !nameMatch[1].toLowerCase().includes("senior")) {
-      graph.name = nameMatch[1].trim();
-      graph.fullName = graph.name;
-    }
-    const roleMatch = cleanMsg.match(/(?:targeting|role:?|as a|for a)\s+((?:[A-Za-z]+\s+)*(?:Engineer|Developer|Architect|Specialist|Manager|Scientist))/i);
-    if (roleMatch && roleMatch[1]) {
-      graph.targetRole = roleMatch[1].trim();
-    }
-  }
-
-  // 6. Conversational State Machine Execution
+  // State Machine Step Progression
   if (!graph.targetRole || step === "role" || step === "targetRole") {
     graph.targetRole = validation.normalizedInformation || cleanMsg;
     return makeReturn({
@@ -843,7 +913,7 @@ function processResumeBuilderMessage({ currentGraph = {}, message = "", userMess
     return makeReturn({
       nextStep: "experience",
       confirmationPending: false,
-      text: `Captured your summary. Tell me about your most recent or primary work experience: What was your title, company, and key technical milestones or metrics?`,
+      text: `Captured your summary. Tell me about your most recent work experience: What was your title, company, and key technical achievements?`,
     });
   }
 
@@ -874,7 +944,7 @@ function processResumeBuilderMessage({ currentGraph = {}, message = "", userMess
 
   if (graph.projects.length === 0) {
     graph.projects.push({
-      name: "Primary Engineering Project",
+      name: "Core Engineering Project",
       tech: graph.skills?.slice(0, 3).join(", ") || "Full Stack",
       bullets: [cleanMsg],
     });
@@ -882,7 +952,7 @@ function processResumeBuilderMessage({ currentGraph = {}, message = "", userMess
     return makeReturn({
       nextStep: "education",
       confirmationPending: false,
-      text: `Captured your project details. What is your educational background or highest degree/certification?`,
+      text: `Captured your project details. What is your educational background or highest degree?`,
     });
   }
 
@@ -892,7 +962,6 @@ function processResumeBuilderMessage({ currentGraph = {}, message = "", userMess
       institution: "Higher Education / Technical Training",
     });
 
-    // All primary sections collected -> Present Structured Review and prompt for confirmation
     const summaryReview = `Here is a summary of your structured resume details:\n` +
       `- Target Role: ${graph.targetRole}\n` +
       `- Name: ${graph.name}${graph.email ? ` (${graph.email})` : ""}\n` +

@@ -104,14 +104,29 @@ router.post("/analyze", upload.any(), async (req, res) => {
 /* =========================================
    CONVERSATIONAL RESUME BUILDER CHAT
 ========================================= */
-router.post("/builder/chat", (req, res) => {
+router.post("/builder/chat", async (req, res) => {
   try {
-    const { currentResume = {}, message = "", step = "start", userConfirmed = false } = req.body;
-    const result = processResumeBuilderMessage({
+    const {
+      currentResume = {},
+      message = "",
+      step = "start",
+      userConfirmed = false,
+      conversationHistory = [],
+    } = req.body;
+
+    const byokKey = req.headers["x-byok-key"] || "";
+    const byokProvider = req.headers["x-byok-provider"] || "openai";
+    const byokModel = req.headers["x-byok-model"] || "";
+
+    const providerConfig = byokKey ? { mode: "byok", provider: byokProvider, apiKey: byokKey, model: byokModel } : { mode: "my_api" };
+
+    const result = await processResumeBuilderMessage({
       currentGraph: currentResume,
       message,
       step,
       userConfirmed,
+      conversationHistory,
+      providerConfig,
     });
 
     res.json({

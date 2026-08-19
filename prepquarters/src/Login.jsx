@@ -166,12 +166,16 @@ function Login({ initialMode = true }) {
     setForgotMessageType("");
 
     if (forgotStep === "request") {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
       try {
         const res = await fetch(`${API_BASE_URL}/api/auth/forgot-password`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          signal: controller.signal,
           body: JSON.stringify({ email: forgotEmail.trim().toLowerCase() }),
         });
+        clearTimeout(timeoutId);
         const data = await res.json();
         if (res.ok && data.success) {
           setForgotMessageType("success");
@@ -183,8 +187,9 @@ function Login({ initialMode = true }) {
           setForgotMessage(data.message || "Could not find an account with this email.");
         }
       } catch (err) {
+        clearTimeout(timeoutId);
         setForgotMessageType("error");
-        setForgotMessage("Failed to reach password recovery service.");
+        setForgotMessage(err.name === "AbortError" ? "Verification request timed out. Please check your network." : "Failed to reach password recovery service.");
       } finally {
         setForgotLoading(false);
       }
@@ -209,10 +214,14 @@ function Login({ initialMode = true }) {
         return;
       }
 
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+
       try {
         const res = await fetch(`${API_BASE_URL}/api/auth/reset-password`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          signal: controller.signal,
           body: JSON.stringify({
             email: forgotEmail.trim().toLowerCase(),
             code: resetTokenInput.trim(),
@@ -220,6 +229,7 @@ function Login({ initialMode = true }) {
             confirmNewPassword,
           }),
         });
+        clearTimeout(timeoutId);
         const data = await res.json();
         if (res.ok && data.success) {
           setForgotMessageType("success");
@@ -237,8 +247,9 @@ function Login({ initialMode = true }) {
           setForgotMessage(data.message || "Invalid verification code or password criteria not met.");
         }
       } catch (err) {
+        clearTimeout(timeoutId);
         setForgotMessageType("error");
-        setForgotMessage("Failed to connect to password reset service.");
+        setForgotMessage(err.name === "AbortError" ? "Password reset request timed out." : "Failed to connect to password reset service.");
       } finally {
         setForgotLoading(false);
       }
