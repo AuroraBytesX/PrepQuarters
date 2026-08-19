@@ -11,7 +11,9 @@ import {
   ChevronLeft,
   ChevronRight,
   RotateCcw,
+  Shield,
 } from "lucide-react";
+import { API_BASE_URL } from "../config/api";
 import "./QuestionLibrary.css";
 
 const DOMAINS = [
@@ -111,7 +113,7 @@ function QuestionLibrary() {
         params.append("search", searchQuery.trim());
       }
 
-      const res = await fetch(`https://prepquarters-backend.onrender.com/api/interview/library/questions?${params.toString()}`);
+      const res = await fetch(`${API_BASE_URL}/api/interview/library/questions?${params.toString()}`);
       if (res.ok) {
         const data = await res.json();
         if (data.success && Array.isArray(data.questions)) {
@@ -119,15 +121,16 @@ function QuestionLibrary() {
         }
       }
     } catch (err) {
-      console.error("Error loading library questions:", err);
+      console.warn("Could not fetch questions:", err.message);
     } finally {
       setLoading(false);
     }
   };
 
-  const toggleBookmark = (item) => {
-    const key = (typeof item === "string" ? item : item?.questionText || "").trim();
+  const toggleBookmark = (q) => {
+    const key = (q.questionText || q.title || "").trim();
     if (!key) return;
+
     setBookmarkedKeys((prev) => {
       const next = new Set(prev);
       if (next.has(key)) {
@@ -143,59 +146,40 @@ function QuestionLibrary() {
   };
 
   const launchPracticeWithQuestion = async (q) => {
-    const token = localStorage.getItem("prepquartersToken");
-    if (!token) {
-      navigate("/login");
-      return;
-    }
-
-    const interviewType =
-      q.questionType === "Coding"
-        ? "Coding Interview"
-        : q.questionType === "Aptitude"
-        ? "Aptitude & Reasoning"
-        : "Technical Interview";
-
     try {
-      const res = await fetch("https://prepquarters-backend.onrender.com/api/interview/start", {
+      const token = localStorage.getItem("prepquartersToken");
+      const headers = { "Content-Type": "application/json" };
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+
+      let mappedModality = "coding";
+      if (q.questionType === "Behavioral" || q.questionType === "Situational") {
+        mappedModality = "hr_behavioral";
+      } else if (q.questionType === "System Design") {
+        mappedModality = "system_design";
+      } else if (q.questionType === "Aptitude") {
+        mappedModality = "aptitude_reasoning";
+      } else if (q.questionType === "Technical" || q.questionType === "Conceptual") {
+        mappedModality = "technical_core";
+      }
+
+      const res = await fetch(`${API_BASE_URL}/api/interview/start`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
+        headers,
         body: JSON.stringify({
-          role: "Software Engineer",
-          domain: q.domain || "Software Engineering",
-          difficulty: q.difficulty || "Hard",
-          companyStyle: q.companyStyle || "General Tech",
-          interviewType,
-          programmingLanguage: q.programmingLanguage || "javascript",
-          totalQuestionsPlanned: 3,
-          initialQuestion: {
-            topic: q.topic,
-            subtopic: q.subtopic,
-            difficulty: q.difficulty,
-            questionText: q.questionText,
-            expectedKeyPoints: q.expectedKeyPoints,
-            questionType: q.questionType || "Technical",
-            starterCode: q.starterCode || "",
-            programmingLanguage: q.programmingLanguage || "javascript",
-            testCases: q.testCases || [],
-            aptitudeOptions: q.aptitudeOptions || [],
-            correctOptionIndex: q.correctOptionIndex,
-            explanation: q.explanation || "",
-            companyStyle: q.companyStyle,
-          },
+          role: q.domain || "Software Engineer",
+          difficulty: q.difficulty || "Medium",
+          interviewType: mappedModality,
+          focusAreas: q.topic ? [q.topic] : ["Algorithms & Data Structures"],
+          language: q.language || "Python",
+          customInitialQuestion: q.questionText || q.problemStatement || q.title,
+          questionSource: q.source || (q.generatedByAI ? "PrepQuarters AI Generated" : "Codeforces"),
+          generatedByAI: Boolean(q.generatedByAI),
         }),
       });
 
-      if (res.ok) {
-        const data = await res.json();
-        if (data.success && data.session) {
-          navigate("/practice/ai-interview/session", {
-            state: { sessionId: data.session._id },
-          });
-        }
+      const data = await res.json();
+      if (res.ok && data.sessionId) {
+        navigate(`/practice/ai-interview/${data.sessionId}`);
       } else {
         navigate("/practice/ai-interview/setup");
       }
@@ -215,7 +199,7 @@ function QuestionLibrary() {
   };
 
   const displayedQuestions = onlyBookmarked
-    ? questions.filter((q) => bookmarkedKeys.has(q.questionText.trim()))
+    ? questions.filter((q) => bookmarkedKeys.has((q.questionText || q.title || "").trim()))
     : questions;
 
   const totalPages = Math.ceil(displayedQuestions.length / PAGE_SIZE) || 1;
@@ -231,15 +215,37 @@ function QuestionLibrary() {
         <section className="ql-hero-section">
           <div className="ql-hero-pill">
             <Sparkles size={14} aria-hidden="true" />
-            <span>Curated Enterprise Scenarios // Question Repository</span>
+            <span>Sourced & Curated Problem Repository</span>
           </div>
 
           <h1 className="ql-hero-title">
             Industry Question Repository
           </h1>
           <p className="ql-hero-subtitle">
-            Explore authentic technical, system design, behavioral, and situational scenarios calibrated for Google, Meta, Amazon, Apple, Netflix, and Stripe.
+            Explore authentic competitive programming problems, system architectures, and behavioral scenarios calibrated across real engineering interviews.
           </p>
+
+          <div
+            style={{
+              marginTop: "16px",
+              padding: "10px 18px",
+              borderRadius: "10px",
+              background: "rgba(16, 185, 129, 0.08)",
+              border: "1px solid rgba(16, 185, 129, 0.25)",
+              fontSize: "0.82rem",
+              color: "#94a3b8",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "8px",
+              maxWidth: "740px",
+              lineHeight: 1.5,
+            }}
+          >
+            <Shield size={16} color="#10b981" style={{ flexShrink: 0 }} />
+            <span>
+              <strong style={{ color: "#34d399" }}>Source Provenance:</strong> Question sources include official Codeforces problem sets, curated PrepQuarters benchmarks, and domain-calibrated AI scenarios targeting an ~80% sourced / ~20% AI generated balance.
+            </span>
+          </div>
         </section>
 
         {/* Filter Navigation Bar */}
@@ -389,25 +395,51 @@ function QuestionLibrary() {
           <>
             <div className="ql-cards-grid">
               {paginatedQuestions.map((q, idx) => {
-                const isBookmarked = bookmarkedKeys.has(q.questionText.trim());
-                const diffClass = q.difficulty ? q.difficulty.toLowerCase() : "hard";
+                const questionKey = (q.questionText || q.title || "").trim();
+                const isBookmarked = bookmarkedKeys.has(questionKey);
+                const diffClass = q.difficulty ? q.difficulty.toLowerCase() : "medium";
+                const displayTitle = q.questionText || q.problemStatement || q.title;
 
                 return (
-                  <article key={idx} className="ql-question-card">
+                  <article key={q.id || idx} className="ql-question-card">
                     <div>
                       {/* Top Badges */}
                       <div className="ql-card-top-row">
                         <div className="ql-badges-wrap">
                           <span className={`ql-badge-difficulty ${diffClass}`}>
-                            {q.difficulty}
+                            {q.difficulty || "Medium"}
                           </span>
 
                           <span className="ql-badge-type">
-                            {q.questionType || "Technical"}
+                            {q.questionType || "Coding"}
                           </span>
 
-                          <span className="ql-badge-company">
-                            {q.companyStyle}
+                          {q.rating && (
+                            <span
+                              className="ql-badge-type"
+                              style={{
+                                background: "rgba(234, 179, 8, 0.12)",
+                                border: "1px solid rgba(234, 179, 8, 0.3)",
+                                color: "#facc15",
+                                fontSize: "0.74rem",
+                                fontWeight: 600,
+                              }}
+                            >
+                              Rating: {q.rating}
+                            </span>
+                          )}
+
+                          <span
+                            className="ql-badge-company"
+                            style={{
+                              background: q.generatedByAI ? "rgba(168, 85, 247, 0.12)" : "rgba(16, 185, 129, 0.12)",
+                              border: q.generatedByAI ? "1px solid rgba(168, 85, 247, 0.3)" : "1px solid rgba(16, 185, 129, 0.3)",
+                              color: q.generatedByAI ? "#c084fc" : "#34d399",
+                              fontSize: "0.74rem",
+                              fontWeight: 600,
+                            }}
+                          >
+                            {q.generatedByAI ? "AI Scenario" : `Source: ${q.source || "Codeforces"}`}
                           </span>
                         </div>
 
@@ -423,7 +455,7 @@ function QuestionLibrary() {
 
                       {/* Topic & Subtopic */}
                       <div className="ql-topic-path">
-                        <span>{q.topic}</span>
+                        <span>{q.topic || "Algorithms"}</span>
                         {q.subtopic && (
                           <>
                             <span className="ql-topic-separator">/</span>
@@ -432,16 +464,27 @@ function QuestionLibrary() {
                         )}
                       </div>
 
+                      {/* Question Tags */}
+                      {Array.isArray(q.tags) && q.tags.length > 0 && (
+                        <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", margin: "8px 0" }}>
+                          {q.tags.slice(0, 3).map((tag, tIdx) => (
+                            <span key={tIdx} style={{ fontSize: "0.72rem", padding: "2px 8px", borderRadius: "4px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "#94a3b8" }}>
+                              #{tag}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
                       {/* Question Text */}
                       <h3 className="ql-question-title">
-                        {q.questionText}
+                        {displayTitle}
                       </h3>
 
                       {/* Expected Rubric Key Points */}
                       {Array.isArray(q.expectedKeyPoints) && q.expectedKeyPoints.length > 0 && (
                         <div className="ql-rubric-box">
                           <span className="ql-rubric-header">
-                            Expected Key Evaluation Points
+                            Key Evaluation Criteria
                           </span>
                           <ul className="ql-rubric-list">
                             {q.expectedKeyPoints.slice(0, 3).map((pt, pIdx) => (
@@ -455,16 +498,37 @@ function QuestionLibrary() {
                       )}
                     </div>
 
-                    {/* Launch Practice Button */}
-                    <div className="ql-card-footer">
+                    {/* Launch Practice Button & External Link */}
+                    <div className="ql-card-footer" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "10px" }}>
                       <button
                         type="button"
                         onClick={() => launchPracticeWithQuestion(q)}
                         className="ql-practice-launch-btn"
+                        style={{ flex: 1 }}
                       >
                         <span>Practice in AI Cockpit</span>
                         <ArrowRight size={14} />
                       </button>
+
+                      {q.url && (
+                        <a
+                          href={q.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{
+                            fontSize: "0.78rem",
+                            color: "#94a3b8",
+                            textDecoration: "none",
+                            padding: "6px 10px",
+                            borderRadius: "6px",
+                            background: "rgba(255,255,255,0.05)",
+                            border: "1px solid rgba(255,255,255,0.1)",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          Source Link
+                        </a>
+                      )}
                     </div>
                   </article>
                 );

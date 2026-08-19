@@ -17,6 +17,7 @@ import QuestionLibrary from "./pages/QuestionLibrary";
 import SkillGapPage from "./pages/SkillGapPage";
 import SystemDocs from "./pages/SystemDocs";
 import ResumeAnalyzer from "./pages/ResumeAnalyzer";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
 
 function App() {
   return (
@@ -28,12 +29,12 @@ function App() {
         {/* Public Routes */}
         <Route path="/" element={<Home />} />
         <Route path="/features" element={<Features />} />
-        <Route path="/learn-more" element={<LearnMore />} />
         <Route path="/docs" element={<SystemDocs />} />
         <Route path="/system-docs" element={<SystemDocs />} />
+        <Route path="/privacy" element={<PrivacyPolicy />} />
         <Route path="/resume-analyzer" element={<ResumeAnalyzer />} />
-        <Route path="/practice/resume-analyzer" element={<ResumeAnalyzer />} />
-        <Route path="/login" element={<Login />} />
+        <Route path="/login" element={<Login initialMode={true} />} />
+        <Route path="/signup" element={<Login initialMode={false} />} />
         <Route path="/practice/question-library" element={<QuestionLibrary />} />
 
         {/* Authenticated Candidate Routes */}

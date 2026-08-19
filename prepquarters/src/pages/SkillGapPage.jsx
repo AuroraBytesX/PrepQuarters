@@ -20,6 +20,7 @@ import {
   HelpCircle,
   Download,
 } from "lucide-react";
+import { API_BASE_URL } from "../config/api";
 
 function SkillGapPage() {
   const navigate = useNavigate();
@@ -37,7 +38,7 @@ function SkillGapPage() {
 
     const fetchStats = async () => {
       try {
-        const res = await fetch("https://prepquarters-backend.onrender.com/api/interview/stats/summary", {
+        const res = await fetch(`${API_BASE_URL}/api/interview/stats/summary`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -62,7 +63,7 @@ function SkillGapPage() {
 
   if (loading) {
     return (
-      <main className="ai-session-page results-page bg-grid-cyber">
+      <main className="ai-session-page results-page">
         <div className="ai-session-container">
           <div className="dashboard-loading-card">
             <span>Loading diagnostic competency telemetry...</span>
@@ -80,7 +81,7 @@ function SkillGapPage() {
   const recommendation = statsData?.recommendedNextPractice;
 
   return (
-    <main className="ai-session-page results-page bg-grid-cyber">
+    <main className="ai-session-page results-page">
       <section className="results-container">
         {/* Header */}
         <div className="results-header-banner">

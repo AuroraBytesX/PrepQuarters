@@ -17,6 +17,7 @@ import {
   TrendingUp,
   Download,
 } from "lucide-react";
+import { API_BASE_URL } from "../config/api";
 
 function InterviewReplay() {
   const { sessionId } = useParams();
@@ -79,7 +80,7 @@ function InterviewReplay() {
 
     const fetchReplay = async () => {
       try {
-        const res = await fetch(`https://prepquarters-backend.onrender.com/api/interview/${sessionId}/replay`, {
+        const res = await fetch(`${API_BASE_URL}/api/interview/${sessionId}/replay`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -103,7 +104,7 @@ function InterviewReplay() {
 
   if (loading) {
     return (
-      <main className="ai-session-page results-page bg-grid-cyber">
+      <main className="ai-session-page results-page">
         <div className="ai-session-container">
           <div className="dashboard-loading-card">
             <span>Loading interview transcript telemetry...</span>
@@ -115,7 +116,7 @@ function InterviewReplay() {
 
   if (error || !session) {
     return (
-      <main className="ai-session-page results-page bg-grid-cyber">
+      <main className="ai-session-page results-page">
         <div className="ai-session-container">
           <div className="session-error-banner" role="alert">
             <AlertCircle size={18} aria-hidden="true" />
@@ -141,7 +142,7 @@ function InterviewReplay() {
   });
 
   return (
-    <main className="ai-session-page replay-page bg-grid-cyber">
+    <main className="ai-session-page replay-page">
       <section className="ai-session-container">
         {/* Replay Header */}
         <div className="session-top-bar">
@@ -188,19 +189,35 @@ function InterviewReplay() {
             <span>Back to Command Center</span>
           </button>
 
-          <button
-            type="button"
-            className="dashboard-secondary-btn"
-            onClick={handleExportReport}
-            style={{
-              borderColor: "rgba(6, 182, 212, 0.4)",
-              color: "var(--cyan-bright)",
-              background: "rgba(6, 182, 212, 0.08)",
-            }}
-          >
-            <Download size={14} aria-hidden="true" />
-            <span>Download Evaluation Report (.md)</span>
-          </button>
+          <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+            <button
+              type="button"
+              className="dashboard-secondary-btn"
+              onClick={handleExportReport}
+            >
+              <Download size={14} aria-hidden="true" />
+              <span>Download Evaluation Scorecard (.md)</span>
+            </button>
+
+            <button
+              type="button"
+              className="dashboard-secondary-btn"
+              onClick={() => {
+                const blob = new Blob([JSON.stringify(session, null, 2)], {
+                  type: "application/json;charset=utf-8;",
+                });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement("a");
+                link.href = url;
+                link.download = `PrepQuarters_Replay_${session._id || session.id}_${Date.now()}.json`;
+                link.click();
+                URL.revokeObjectURL(url);
+              }}
+            >
+              <Download size={14} aria-hidden="true" />
+              <span>Download Telemetry (.json)</span>
+            </button>
+          </div>
         </div>
 
         {/* Question by Question Transcript */}

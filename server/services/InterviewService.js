@@ -1,7 +1,7 @@
 /*
  * AI Interview Service
  * PrepQuarters Core Orchestration Engine
- * Integrates NVIDIA NIM LLM inference with adaptive questioning,
+ * Integrates AI reasoning models with adaptive questioning,
  * domain intelligence, intelligent follow-ups, and skill-gap analysis.
  */
 
@@ -10,18 +10,35 @@ const {
   CODING_PROBLEMS,
   APTITUDE_QUESTIONS,
   LANGUAGE_QUESTIONS,
+  HR_BEHAVIORAL_QUESTIONS,
+  SYSTEM_DESIGN_SCENARIOS,
   getDomainConfig,
   getCompanyStyleProfile,
 } = require("./DomainKnowledge");
 
 const {
-  isNimConfigured,
-  callNimChatCompletion,
-} = require("./NvidiaNimService");
+  callAiChatCompletion,
+} = require("./AiProviderService");
+
+const {
+  executeCodeSandbox,
+} = require("./CodingSandboxService");
 
 const {
   validateCandidateAnswer,
 } = require("./AnswerValidationService");
+
+const { cleanDisallowedChars } = require("./SanitizationHelper");
+
+function isAiConfigured() {
+  return Boolean(
+    (process.env.NVIDIA_NIM_API_KEY && process.env.NVIDIA_NIM_API_KEY.trim()) ||
+    (process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY.trim()) ||
+    (process.env.ANTHROPIC_API_KEY && process.env.ANTHROPIC_API_KEY.trim()) ||
+    (process.env.XAI_API_KEY && process.env.XAI_API_KEY.trim()) ||
+    (process.env.GROQ_API_KEY && process.env.GROQ_API_KEY.trim())
+  );
+}
 
 /**
  * Generates the opening interview question based on interviewType, domain, and language.
@@ -43,12 +60,12 @@ async function generateInitialQuestion({
 }) {
   const domainConfig = getDomainConfig(domain);
   const companyProfile = getCompanyStyleProfile(domain, companyStyle);
+  const usedTexts = new Set((previouslyAskedTexts || []).map((t) => t.toLowerCase().trim()));
 
   // 1. Specialized Coding Interview Mode or Language-Specific with DSA
   if (interviewType.includes("Coding") || (interviewType.includes("Language-Specific") && dsaEnabled)) {
     const lang = (programmingLanguage || "javascript").toLowerCase();
     const targetTopics = Array.isArray(dsaTopics) && dsaTopics.length > 0 ? dsaTopics.map((t) => t.toLowerCase()) : [];
-    const usedTexts = new Set((previouslyAskedTexts || []).map((t) => t.toLowerCase().trim()));
     
     let matching = CODING_PROBLEMS.filter((p) => !usedTexts.has(p.questionText.toLowerCase().trim()));
     if (targetTopics.length > 0) {
@@ -79,11 +96,18 @@ async function generateInitialQuestion({
     const targetCategories = Array.isArray(aptitudeFocusAreas) && aptitudeFocusAreas.length > 0
       ? aptitudeFocusAreas.map((c) => c.toLowerCase())
       : [];
-    const usedTexts = new Set((previouslyAskedTexts || []).map((t) => t.toLowerCase().trim()));
     
     let matching = APTITUDE_QUESTIONS.filter((q) => !usedTexts.has(q.questionText.toLowerCase().trim()));
+    if (difficulty === "Easy") {
+      const easyMatches = matching.filter((q) => q.difficulty === "Easy");
+      if (easyMatches.length > 0) matching = easyMatches;
+    } else if (difficulty === "Medium") {
+      const medMatches = matching.filter((q) => q.difficulty === "Medium");
+      if (medMatches.length > 0) matching = medMatches;
+    }
+
     if (targetCategories.length > 0) {
-      const catMatches = matching.filter((q) => targetCategories.some((c) => q.topic.toLowerCase().includes(c) || q.subtopic.toLowerCase().includes(c)));
+      const catMatches = matching.filter((q) => targetCategories.some((c) => q.subtopic.toLowerCase().includes(c) || q.topic.toLowerCase().includes(c)));
       if (catMatches.length > 0) matching = catMatches;
     }
 
@@ -94,37 +118,171 @@ async function generateInitialQuestion({
       subtopic: selected.subtopic,
       questionType: "Aptitude",
       difficulty: selected.difficulty || difficulty,
-      aptitudeOptions: selected.aptitudeOptions,
+      aptitudeOptions: selected.aptitudeOptions || [],
       correctOptionIndex: selected.correctOptionIndex,
       explanation: selected.explanation,
-      starterCode: "",
-      referenceSolution: `Correct Answer: Option ${String.fromCharCode(65 + selected.correctOptionIndex)}\nExplanation:\n${selected.explanation}`,
-      hints: [
-        `Identify the fundamental formula or deduction pattern connecting the given values.`,
-        `Calculate step by step to verify logical consistency.`,
-      ],
       questionText: cleanDisallowedChars(selected.questionText),
-      expectedKeyPoints: selected.expectedKeyPoints || ["Correct mathematical deduction"],
+      expectedKeyPoints: [`Correct analytical deduction: Option ${String.fromCharCode(65 + (selected.correctOptionIndex || 0))}`],
       source: "aptitude-knowledge-bank",
     };
   }
 
-  // 3. Language-Specific Technical Mode
-  if (interviewType.includes("Language-Specific") || interviewType.includes("Language-specific")) {
-    const lang = (programmingLanguage || "javascript").toLowerCase();
-    const langQuestions = LANGUAGE_QUESTIONS[lang] || LANGUAGE_QUESTIONS.javascript;
-    if (langQuestions && langQuestions.length > 0) {
-      const usedTexts = new Set((previouslyAskedTexts || []).map((t) => t.toLowerCase().trim()));
-      const fresh = langQuestions.filter((q) => !usedTexts.has(q.questionText.toLowerCase().trim()));
-      const selected = fresh.length > 0 ? fresh[0] : langQuestions[0];
+  // 3. HR & Behavioral Mode (Strictly Non-Technical)
+  if (interviewType.includes("HR") || interviewType.includes("Behavioral")) {
+    if (isAiConfigured()) {
+      const systemPrompt = `You are a senior HR director and executive behavioral interviewer at ${companyStyle}.
+Target Role: ${role}
+Difficulty Level: ${difficulty}
+Interview Modality: HR / Behavioral (Situational & Leadership)
 
+CRITICAL RULES:
+1. Ask exactly ONE realistic workplace situational or behavioral scenario.
+2. STRICTLY FORBIDDEN: DO NOT ask coding, programming, algorithms, data structures, system implementation, or technical architecture questions.
+3. Focus strictly on: teamwork, handling conflict, leadership, taking ownership of mistakes, handling pressure, communication with stakeholders, adaptability under shifting requirements, or workplace ethics.
+4. Output strict JSON with NO em dashes and NO emojis:
+{
+  "topic": "Conflict Resolution",
+  "subtopic": "Handling Disagreement",
+  "questionType": "Behavioral",
+  "questionText": "The behavioral question text",
+  "expectedKeyPoints": [
+    "Context and Situation framing (STAR method)",
+    "Direct personal Action and ownership taken",
+    "Constructive outcome, reflection, or learning"
+  ]
+}`;
+
+      const userPrompt = `Generate a fresh, realistic behavioral interview scenario for a candidate targeting ${role}. Focus on workplace collaboration, conflict resolution, leadership, or handling project pressure. (Seed: ${Date.now()}_${Math.random()})`;
+
+      const nimResult = await callAiChatCompletion({
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        temperature: 0.7,
+        maxTokens: 600,
+        jsonMode: true,
+      });
+
+      if (nimResult.success && nimResult.json && nimResult.json.questionText) {
+        return {
+          topic: nimResult.json.topic || "Behavioral Competency",
+          subtopic: nimResult.json.subtopic || "Workplace Scenario",
+          questionType: "Behavioral",
+          difficulty,
+          questionText: cleanDisallowedChars(nimResult.json.questionText),
+          expectedKeyPoints: Array.isArray(nimResult.json.expectedKeyPoints)
+            ? nimResult.json.expectedKeyPoints.map(cleanDisallowedChars)
+            : ["Situation framing", "Personal ownership and action", "Measurable outcome"],
+          isFollowUp: false,
+          source: "ai-provider",
+        };
+      }
+    }
+
+    // Curated HR fallback
+    const freshHr = HR_BEHAVIORAL_QUESTIONS.filter((q) => !usedTexts.has(q.questionText.toLowerCase().trim()));
+    const chosenHr = freshHr.length > 0 ? freshHr[0] : HR_BEHAVIORAL_QUESTIONS[0];
+    return {
+      topic: chosenHr.topic,
+      subtopic: chosenHr.subtopic,
+      questionType: "Behavioral",
+      difficulty: chosenHr.difficulty || difficulty,
+      questionText: cleanDisallowedChars(chosenHr.questionText),
+      expectedKeyPoints: (chosenHr.expectedKeyPoints || []).map(cleanDisallowedChars),
+      source: "curated-hr-bank",
+    };
+  }
+
+  // 4. System Design Mode (Strictly Architectural Design Thinking - NO CODING)
+  if (interviewType.includes("System Design")) {
+    if (isAiConfigured()) {
+      const systemPrompt = `You are a Principal Enterprise Architect conducting a System Design Interview for domain: ${domain}, role: ${role}.
+Difficulty Level: ${difficulty}
+Company Focus: ${companyProfile.focus}
+
+CRITICAL RULES:
+1. Ask exactly ONE high-level system architecture and design scenario tailored specifically to ${domain} and ${role}.
+2. STRICTLY FORBIDDEN: DO NOT ask the candidate to write code, implement algorithms, solve DSA problems, or write syntax functions.
+3. Focus strictly on design thinking: requirements clarification, system component boundaries, data flow, scale (throughput/latency), storage choices, caching, message queues, consistency, partition failure handling, and observability.
+4. Output strict JSON with NO em dashes and NO emojis:
+{
+  "topic": "System Architecture",
+  "subtopic": "Distributed System Design",
+  "questionType": "System Design",
+  "questionText": "The architectural scenario question text",
+  "expectedKeyPoints": [
+    "Component boundaries and data flow decomposition",
+    "Scalability, caching, and storage trade-offs",
+    "Failure isolation, partition handling, and consistency guarantees"
+  ]
+}`;
+
+      const userPrompt = `Generate a fresh, domain-adapted system design scenario for ${role} in ${domain}. Focus on high-scale architecture, trade-offs, and failure handling. (Seed: ${Date.now()}_${Math.random()})`;
+
+      const nimResult = await callAiChatCompletion({
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        temperature: 0.6,
+        maxTokens: 600,
+        jsonMode: true,
+      });
+
+      if (nimResult.success && nimResult.json && nimResult.json.questionText) {
+        return {
+          topic: nimResult.json.topic || "System Architecture",
+          subtopic: nimResult.json.subtopic || "High Availability & Scale",
+          questionType: "System Design",
+          difficulty,
+          questionText: cleanDisallowedChars(nimResult.json.questionText),
+          expectedKeyPoints: Array.isArray(nimResult.json.expectedKeyPoints)
+            ? nimResult.json.expectedKeyPoints.map(cleanDisallowedChars)
+            : ["Component boundaries", "Scalability trade-offs", "Failure domain isolation"],
+          isFollowUp: false,
+          source: "ai-provider",
+        };
+      }
+    }
+
+    // Curated System Design fallback
+    const domainScenarios = SYSTEM_DESIGN_SCENARIOS[domain] || SYSTEM_DESIGN_SCENARIOS["Software Engineering"] || [];
+    const freshSd = domainScenarios.filter((q) => !usedTexts.has(q.questionText.toLowerCase().trim()));
+    const chosenSd = freshSd.length > 0 ? freshSd[0] : (domainScenarios[0] || SYSTEM_DESIGN_SCENARIOS["Software Engineering"][0]);
+    return {
+      topic: chosenSd.topic,
+      subtopic: chosenSd.subtopic,
+      questionType: "System Design",
+      difficulty: chosenSd.difficulty || difficulty,
+      questionText: cleanDisallowedChars(chosenSd.questionText),
+      expectedKeyPoints: (chosenSd.expectedKeyPoints || []).map(cleanDisallowedChars),
+      source: "curated-system-design-bank",
+    };
+  }
+
+  // 5. Language-Specific Technical Mode
+  if (interviewType.includes("Language-Specific") && !dsaEnabled) {
+    const lang = (programmingLanguage || "javascript").toLowerCase();
+    const langQuestions = LANGUAGE_QUESTIONS[lang] || LANGUAGE_QUESTIONS.javascript || [];
+    let matching = langQuestions.filter((q) => !usedTexts.has(q.questionText.toLowerCase().trim()));
+    
+    if (difficulty === "Hard") {
+      const hardMatches = matching.filter((q) => q.difficulty === "Hard");
+      if (hardMatches.length > 0) matching = hardMatches;
+    } else if (difficulty === "Easy") {
+      const easyMatches = matching.filter((q) => q.difficulty === "Easy");
+      if (easyMatches.length > 0) matching = easyMatches;
+    }
+
+    if (matching.length > 0) {
+      const selected = matching[0];
       return {
         topic: selected.topic,
-        subtopic: selected.subtopic,
+        subtopic: `${selected.language} Internals`,
         questionType: "Technical",
         difficulty: selected.difficulty || difficulty,
         programmingLanguage: lang,
-        starterCode: "",
         referenceSolution: `Reference Benchmark for ${selected.topic}:\n- Key Points: ${(selected.expectedKeyPoints || []).join("; ")}`,
         hints: [
           `Consider how ${lang} handles memory layout and execution order internally.`,
@@ -137,13 +295,14 @@ async function generateInitialQuestion({
     }
   }
 
-  if (isNimConfigured()) {
+  // 6. General / Technical / Voice Mock Mode
+  if (isAiConfigured()) {
     const excludeList = (previouslyAskedTexts || [])
       .slice(0, 15)
       .map((t) => `"${t}"`)
       .join("; ");
 
-    const systemPrompt = `You are a senior hiring manager and principal interviewer at a top technology company.
+    const systemPrompt = `You are a senior hiring manager and principal interviewer at ${companyStyle}.
 Domain: ${domain}
 Target Role: ${role}
 Difficulty Level: ${difficulty}
@@ -156,11 +315,9 @@ CRITICAL RULES:
 2. DO NOT ask or repeat any of these previously asked questions: [${excludeList || "None"}].
 3. Calibrate strictly to difficulty:
    - "Hard": Focus on high-scale distributed systems, multi-region architecture, concurrency, subtle failure modes, or complex trade-offs.
-   - "Medium": Focus on realistic system components, database query optimization, security, background worker queues, or practical design decisions.
-   - "Easy": Focus on core CS data structures, fundamental protocol mechanics (REST vs GraphQL, B-Tree index basics), clean code, and foundational concepts.
-4. Do not include greetings like "Hello!" in questionText. Output ONLY the interview question.
-5. NEVER use em dashes or emojis anywhere in your response.
-6. Output your response in valid JSON matching this schema:
+   - "Medium": Focus on practical system design, service boundaries, database design, caching, or failure handling.
+   - "Easy": Focus on foundational concepts, fundamental definitions, and core architectural components.
+4. Output strict JSON with NO em dashes and NO emojis:
 {
   "topic": "Specific Topic Name",
   "subtopic": "Specific Subtopic Name",
@@ -175,13 +332,15 @@ CRITICAL RULES:
 
     const userPrompt = `Generate a fresh, unique opening question for a ${difficulty} level interview for ${role} in ${domain}. Interview Type: ${interviewType}. Company style: ${companyStyle}. (Seed: ${Date.now()}_${Math.random()})`;
 
-    const nimResult = await callNimChatCompletion(
-      [
+    const nimResult = await callAiChatCompletion({
+      messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
       ],
-      { temperature: 0.6, max_tokens: 600, jsonMode: true }
-    );
+      temperature: 0.6,
+      maxTokens: 600,
+      jsonMode: true,
+    });
 
     if (nimResult.success && nimResult.json && nimResult.json.questionText) {
       return {
@@ -192,37 +351,54 @@ CRITICAL RULES:
         questionText: cleanDisallowedChars(nimResult.json.questionText),
         expectedKeyPoints: Array.isArray(nimResult.json.expectedKeyPoints)
           ? nimResult.json.expectedKeyPoints.map(cleanDisallowedChars)
-          : ["Clear problem understanding", "Technical trade-offs", "Structured explanation"],
-        source: "nvidia-nim",
+          : ["Comprehensive conceptual explanation", "Trade-off analysis"],
+        isFollowUp: false,
+        source: "ai-provider",
       };
     }
   }
 
-  // Fallback to curated domain knowledge base with cross-session uniqueness
-  return getCuratedInitialQuestion({ domain, difficulty, companyStyle, previouslyAskedTexts, interviewType, programmingLanguage });
+  // Curated Fallback
+  return getCuratedInitialQuestion({
+    domain,
+    role,
+    difficulty,
+    companyStyle,
+    previouslyAskedTexts,
+    interviewType,
+    programmingLanguage,
+  });
 }
 
 /**
- * Evaluates candidate answer and decides next step (follow-up vs next topic).
+ * Evaluates candidate answer with strict relevance gate and ZERO-score rule.
  */
 async function evaluateAnswerAndGenerateNext({
-  role,
-  domain,
-  difficulty = "Hard",
-  companyStyle = "General Tech",
+  session,
   currentQuestion,
   candidateAnswer,
-  previousQuestions = [],
-  questionIndex,
-  totalPlanned,
   timeSpentSeconds = 0,
 }) {
+  const {
+    role = "Software Engineer",
+    domain = "Software Engineering",
+    difficulty = "Hard",
+    companyStyle = "General Tech",
+    interviewType = "Mixed",
+    totalQuestionsPlanned = 5,
+    currentQuestionIndex = 0,
+    questions = [],
+  } = session || {};
+
+  const totalPlanned = totalQuestionsPlanned || 5;
+  const questionIndex = currentQuestionIndex || 0;
+  const previousQuestions = questions.slice(0, questionIndex);
   const domainConfig = getDomainConfig(domain);
   const companyProfile = getCompanyStyleProfile(domain, companyStyle);
 
   const cleanAnswer = cleanDisallowedChars(candidateAnswer || "").trim();
 
-  // Step 1: Intelligent Answer Validation
+  // Step 1: Sanity & basic validation
   const validation = validateCandidateAnswer({
     questionText: currentQuestion.questionText,
     topic: currentQuestion.topic,
@@ -239,13 +415,15 @@ async function evaluateAnswerAndGenerateNext({
       validationReason: validation.reason,
       retryPrompt: validation.retryPrompt,
       evaluation: {
-        score: null,
+        score: 0,
+        relevant: false,
+        technicallyMeaningful: false,
         technicalAccuracy: validation.reason,
-        reasoning: "Answer was insufficient or invalid for scoring.",
-        communicationClarity: "Please re-attempt the scenario with structured technical reasoning.",
+        reasoning: "Answer lacked substantive content.",
+        communicationClarity: "Please re-attempt the scenario with structured reasoning.",
         strengths: [],
         improvements: [validation.retryPrompt],
-        keyMissedPoints: currentQuestion.expectedKeyPoints || ["Comprehensive conceptual explanation"],
+        keyMissedPoints: currentQuestion.expectedKeyPoints || ["Structured problem-solving explanation"],
         suggestedModelAnswer: "",
       },
       isFollowUp: false,
@@ -254,8 +432,11 @@ async function evaluateAnswerAndGenerateNext({
     };
   }
 
-  // Step 2: Valid Answer Evaluation (NVIDIA NIM or Fallback)
-  if (isNimConfigured()) {
+  // Step 2: LLM Evaluation with Relevance Classification Gate & Zero Score Rule
+  if (isAiConfigured()) {
+    const isBehavioral = currentQuestion.questionType === "Behavioral" || (interviewType && (interviewType.includes("HR") || interviewType.includes("Behavioral")));
+    const isSystemDesign = currentQuestion.questionType === "System Design" || (interviewType && interviewType.includes("System Design"));
+
     const historySummary = previousQuestions
       .map((q, idx) => `Q${idx + 1} [Topic: ${q.topic}]: "${q.questionText}"\nScore: ${q.evaluation?.score || "N/A"}/10`)
       .join("\n\n");
@@ -264,13 +445,104 @@ async function evaluateAnswerAndGenerateNext({
       .map((q) => `"${q.questionText}" (Topic: ${q.topic})`)
       .join("; ");
 
-    const systemPrompt = `You are a senior technical interviewer and bar raiser at ${companyStyle}.
+    let systemPrompt = "";
+
+    if (isBehavioral) {
+      systemPrompt = `You are a Senior HR Director and Executive Bar Raiser at ${companyStyle}.
+Target Role: ${role}
+Interview Modality: HR & Behavioral (Situational & Leadership)
+
+You are evaluating the candidate's answer to this behavioral scenario:
+Question: "${currentQuestion.questionText}"
+Topic: "${currentQuestion.topic}"
+Expected Evaluation Points: ${JSON.stringify(currentQuestion.expectedKeyPoints || [])}
+
+Interview History so far:
+${historySummary || "This is the first scenario."}
+
+CRITICAL BEHAVIORAL EVALUATION RULES:
+1. Focus strictly on behavioral traits: STAR framework (Situation, Task, Action, Result), personal accountability, constructive conflict resolution, empathy, leadership, and communication clarity.
+2. DO NOT evaluate or penalize for missing programming code or technical concepts.
+3. ZERO SCORE RULE: Gibberish, unrelated text, or empty answers receive Score = 0.
+4. PARTIAL CREDIT (3-5): For responses that describe a situation but miss clear personal action or measurable results.
+5. HIGH MARKS (7-10): For structured, mature responses demonstrating ownership, collaborative resolution, and clear learning outcomes.
+
+Output valid JSON matching this schema (NO em dashes, NO emojis):
+{
+  "relevant": true,
+  "technicallyMeaningful": true,
+  "evaluation": {
+    "score": 8,
+    "technicalAccuracy": "Analysis of behavioral structure, ownership, and STAR approach",
+    "reasoning": "Assessment of interpersonal conflict resolution and professional maturity",
+    "communicationClarity": "Analysis of delivery, conciseness, and professional tone",
+    "strengths": ["Specific behavioral strength 1", "Specific behavioral strength 2"],
+    "improvements": ["Specific behavioral improvement 1", "Specific behavioral improvement 2"],
+    "keyMissedPoints": ["Key point missed 1"],
+    "suggestedModelAnswer": "A concise STAR-structured model answer"
+  },
+  "shouldAskFollowUp": false,
+  "followUpReason": "",
+  "nextQuestion": {
+    "topic": "Teamwork & Collaboration",
+    "subtopic": "Cross-Functional Alignment",
+    "questionType": "Behavioral",
+    "difficulty": "${difficulty}",
+    "questionText": "The next behavioral question text",
+    "expectedKeyPoints": ["Point 1", "Point 2", "Point 3"]
+  }
+}`;
+    } else if (isSystemDesign) {
+      systemPrompt = `You are a Principal Enterprise Architect conducting a System Design Interview at ${companyStyle}.
+Domain: ${domain}
+Target Role: ${role}
+Difficulty Level: ${difficulty}
+
+You are evaluating the candidate's architecture design for this scenario:
+Question: "${currentQuestion.questionText}"
+Topic: "${currentQuestion.topic}"
+Expected Architecture Points: ${JSON.stringify(currentQuestion.expectedKeyPoints || [])}
+
+CRITICAL SYSTEM DESIGN EVALUATION RULES:
+1. Evaluate architectural design thinking: requirement clarification, component boundaries, scale (RPS/latency), data storage, caching, queues, failure modes, and trade-offs.
+2. DO NOT require or expect the candidate to write code syntax or functions.
+3. ZERO SCORE RULE: Gibberish, unrelated text, or empty answers receive Score = 0.
+4. PARTIAL CREDIT (3-5): For naming components without analyzing scaling trade-offs or failure modes.
+5. HIGH MARKS (7-10): For comprehensive architectures addressing scale, multi-region partitions, and trade-offs.
+
+Output valid JSON matching this schema (NO em dashes, NO emojis):
+{
+  "relevant": true,
+  "technicallyMeaningful": true,
+  "evaluation": {
+    "score": 8,
+    "technicalAccuracy": "Analysis of architecture design, component choices, and trade-offs",
+    "reasoning": "Assessment of scaling, caching, and failure isolation decomposition",
+    "communicationClarity": "Analysis of architectural terminology and clarity",
+    "strengths": ["Specific strength 1", "Specific strength 2"],
+    "improvements": ["Specific improvement 1", "Specific improvement 2"],
+    "keyMissedPoints": ["Key point missed 1", "Key point missed 2"],
+    "suggestedModelAnswer": "A concise, high-standard architecture design breakdown"
+  },
+  "shouldAskFollowUp": false,
+  "followUpReason": "",
+  "nextQuestion": {
+    "topic": "System Architecture",
+    "subtopic": "High Scale Service",
+    "questionType": "System Design",
+    "difficulty": "${difficulty}",
+    "questionText": "The next system design question text",
+    "expectedKeyPoints": ["Point 1", "Point 2", "Point 3"]
+  }
+}`;
+    } else {
+      systemPrompt = `You are a principal technical interviewer and bar raiser at ${companyStyle}.
 Domain: ${domain}
 Role: ${role}
 Current Difficulty: ${difficulty}
 Company Focus: ${companyProfile.focus}
 
-You are evaluating the candidate's answer to the following scenario:
+You are evaluating the candidate's answer to this specific question:
 Question: "${currentQuestion.questionText}"
 Topic: "${currentQuestion.topic}"
 Expected Key Points: ${JSON.stringify(currentQuestion.expectedKeyPoints || [])}
@@ -278,18 +550,29 @@ Expected Key Points: ${JSON.stringify(currentQuestion.expectedKeyPoints || [])}
 Interview History so far:
 ${historySummary || "This is the first scenario."}
 
-CRITICAL EVALUATION & ADAPTIVE FOLLOW-UP GUIDELINES:
-1. Objectively evaluate technical correctness, conceptual depth, reasoning quality, and communication on a scale of 1 to 10. Technical accuracy must strictly drive the score.
-2. Identify specific strengths demonstrated and precise missing points or edge-case omissions.
-3. DECISION ON NEXT STEP:
-   - If the candidate's answer missed important nuance or made a questionable architectural assertion, and is on scenario index ${questionIndex + 1} of ${totalPlanned}, set "shouldAskFollowUp": true and formulate an adaptive follow-up question directly probing their previous answer assertions.
-   - If generating a new independent scenario (when shouldAskFollowUp is false):
-     * NEVER repeat or ask semantically similar questions to any of: [${alreadyAskedQuestionsList}].
-     * Pick a completely DIFFERENT competency within ${domain} from: ${JSON.stringify(domainConfig.skillCategories || [])}.
-   - If this is the final planned scenario (${questionIndex + 1} >= ${totalPlanned}), set "shouldAskFollowUp": false.
-4. NEVER use em dashes or emojis anywhere in your response.
-5. Return valid JSON matching this schema:
+CRITICAL TWO-TIER EVALUATION RULES:
+TIER 1: RELEVANCE & SANITY GATE:
+- Check if the answer actually addresses the question asked.
+- KEYWORD STUFFING: If the response is merely a list, dump, or dictionary of technical keywords without explanatory sentences or architectural reasoning, it is INVALID. Set "relevant": false, "technicallyMeaningful": false, and "score": 0.
+- If the answer is unrelated, fundamentally wrong, nonsensical, generic filler, or discusses a different topic:
+  * set "relevant": false
+  * set "technicallyMeaningful": false
+  * set "score": 0
+
+TIER 2: ACCURACY & SCORING:
+- ZERO SCORE RULE (MANDATORY): Unrelated, gibberish, empty, or keyword-stuffed text receives Score = 0. Word count or length must NEVER award marks.
+- INCOMPLETE ANSWERS (Capped at 3 to 5): If an answer is correct but brief/incomplete (only naming one basic concept while omitting distributed scale, failure modes, partitions, or trade-offs), you MUST cap the score between 3 and 5 (partial credit). NEVER award 7+ to a brief, incomplete single-sentence answer.
+- HIGH MARKS (7-10): Only for answers that explain architecture, trade-offs, and failure handling in depth.
+- For spoken voice transcripts with minor natural filler ("um", "like"), evaluate the underlying technical substance.
+
+DECISION ON NEXT QUESTION:
+- If follow-up probing is needed on index ${questionIndex + 1} of ${totalPlanned}, set "shouldAskFollowUp": true.
+- If generating next scenario, pick a completely different topic from [${alreadyAskedQuestionsList}] within ${domain}.
+
+Output valid JSON matching this schema (NO em dashes, NO emojis):
 {
+  "relevant": true,
+  "technicallyMeaningful": true,
   "evaluation": {
     "score": 8,
     "technicalAccuracy": "Detailed analysis of technical correctness and depth",
@@ -301,7 +584,7 @@ CRITICAL EVALUATION & ADAPTIVE FOLLOW-UP GUIDELINES:
     "suggestedModelAnswer": "A concise, high-standard model response illustrating what a top 5% candidate would say"
   },
   "shouldAskFollowUp": false,
-  "followUpReason": "Reason for follow-up if applicable",
+  "followUpReason": "",
   "nextQuestion": {
     "topic": "Different Topic Name",
     "subtopic": "Subtopic Name",
@@ -311,28 +594,67 @@ CRITICAL EVALUATION & ADAPTIVE FOLLOW-UP GUIDELINES:
     "expectedKeyPoints": ["Point 1", "Point 2", "Point 3"]
   }
 }`;
+    }
 
     const userPrompt = `Candidate Answer:\n"${cleanAnswer}"\n\nEvaluate this answer and determine the next scenario or follow-up.`;
 
-    const nimResult = await callNimChatCompletion(
-      [
+    const nimResult = await callAiChatCompletion({
+      messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
       ],
-      { temperature: 0.3, max_tokens: 1400, jsonMode: true }
-    );
+      temperature: 0.1,
+      maxTokens: 1400,
+      jsonMode: true,
+    });
 
     if (nimResult.success && nimResult.json && nimResult.json.evaluation) {
       const evalData = nimResult.json.evaluation;
+      const isRelevant = nimResult.json.relevant !== false;
+      const isMeaningful = nimResult.json.technicallyMeaningful !== false;
+      let rawScore = Number(evalData.score) || 0;
+
+      // Programmatic Keyword Dump & Disconnected Token Detector
+      const words = cleanAnswer.split(/\s+/).filter(Boolean);
+      const predicateVerbs = [
+        "is", "are", "was", "were", "be", "been", "being", "have", "has", "had", "do", "does", "did",
+        "can", "could", "should", "would", "will", "may", "might", "must",
+        "use", "uses", "using", "used", "implement", "implements", "implementing", "design", "designs",
+        "handles", "handled", "handling", "fails", "failing", "failed", "store", "stores", "storing",
+        "replicate", "replicating", "replicated", "process", "processes", "processing", "send", "sends",
+        "receive", "receives", "synchronize", "synchronizing", "ensure", "ensuring", "mitigate",
+        "track", "tracking", "reject", "rejecting", "mix", "bake", "make", "makes", "hit", "hits",
+        "drop", "drops", "block", "blocked", "run", "runs", "set", "sets", "get", "gets", "put",
+        "keep", "keeps", "take", "takes", "write", "read", "call", "check", "need", "work",
+        "talked", "discussed", "decided", "aligned", "collaborated", "managed", "resolved", "learned"
+      ];
+      const connectingWords = ["with", "to", "for", "by", "in", "when", "if", "because", "that", "and", "so", "as", "from", "on", "across", "between", "of", "into", "it", "so", "i", "my", "we", "our"];
+      const lowerClean = cleanAnswer.toLowerCase();
+      const predicateMatches = predicateVerbs.filter((v) => new RegExp(`\\b${v}\\b`, "i").test(lowerClean)).length;
+      const connectorMatches = connectingWords.filter((w) => new RegExp(`\\b${w}\\b`, "i").test(lowerClean)).length;
+      const isKeywordDump = words.length >= 8 && (predicateMatches === 0 || connectorMatches === 0);
+
+      if (isKeywordDump || !isRelevant || !isMeaningful || rawScore === 0) {
+        rawScore = 0;
+      }
+
+      // If answer is very brief (< 25 words) for technical scenarios, cap score at partial credit (max 5)
+      if (!isBehavioral && rawScore > 5 && words.length < 25 && (currentQuestion.expectedKeyPoints || []).length >= 3) {
+        rawScore = 5;
+      }
+
+      const finalScore = Math.min(10, Math.max(0, rawScore));
       const shouldFollowUp = Boolean(nimResult.json.shouldAskFollowUp && questionIndex + 1 < totalPlanned);
 
       const cleanedEval = {
-        score: Math.min(10, Math.max(1, Number(evalData.score) || 6)),
-        technicalAccuracy: cleanDisallowedChars(evalData.technicalAccuracy || "Answer evaluated based on domain criteria."),
-        reasoning: cleanDisallowedChars(evalData.reasoning || "Technical reasoning analyzed."),
-        communicationClarity: cleanDisallowedChars(evalData.communicationClarity || "Response structure and delivery analyzed."),
-        strengths: (evalData.strengths || ["Addressed the core subject."]).map(cleanDisallowedChars),
-        improvements: (evalData.improvements || ["Provide deeper architectural considerations."]).map(cleanDisallowedChars),
+        score: finalScore,
+        relevant: isRelevant && finalScore > 0,
+        technicallyMeaningful: isMeaningful && finalScore > 0,
+        technicalAccuracy: cleanDisallowedChars(evalData.technicalAccuracy || (finalScore === 0 ? "The answer did not address the specific requirements of the scenario." : "Answer evaluated.")),
+        reasoning: cleanDisallowedChars(evalData.reasoning || (finalScore === 0 ? "No valid reasoning demonstrated for this scenario." : "Reasoning analyzed.")),
+        communicationClarity: cleanDisallowedChars(evalData.communicationClarity || "Response analyzed."),
+        strengths: finalScore > 0 ? (evalData.strengths || ["Addressed the core subject."]).map(cleanDisallowedChars) : [],
+        improvements: (evalData.improvements || ["Address the exact scenario requirements."]).map(cleanDisallowedChars),
         keyMissedPoints: (evalData.keyMissedPoints || []).map(cleanDisallowedChars),
         suggestedModelAnswer: cleanDisallowedChars(evalData.suggestedModelAnswer || ""),
       };
@@ -342,13 +664,13 @@ CRITICAL EVALUATION & ADAPTIVE FOLLOW-UP GUIDELINES:
         nextQ = {
           topic: nimResult.json.nextQuestion.topic || currentQuestion.topic,
           subtopic: nimResult.json.nextQuestion.subtopic || "Scenario",
-          questionType: nimResult.json.nextQuestion.questionType || "Technical",
+          questionType: isBehavioral ? "Behavioral" : (isSystemDesign ? "System Design" : (nimResult.json.nextQuestion.questionType || "Technical")),
           difficulty: nimResult.json.nextQuestion.difficulty || difficulty,
           questionText: cleanDisallowedChars(nimResult.json.nextQuestion.questionText),
           expectedKeyPoints: (nimResult.json.nextQuestion.expectedKeyPoints || []).map(cleanDisallowedChars),
           isFollowUp: shouldFollowUp,
           followUpReason: cleanDisallowedChars(nimResult.json.followUpReason || ""),
-          source: "nvidia-nim",
+          source: "ai-provider",
         };
       }
 
@@ -362,7 +684,7 @@ CRITICAL EVALUATION & ADAPTIVE FOLLOW-UP GUIDELINES:
     }
   }
 
-  // Fallback to curated evaluation engine
+  // Fallback to deterministic rubric evaluation
   return evaluateAnswerCurated({
     domain,
     role,
@@ -377,344 +699,8 @@ CRITICAL EVALUATION & ADAPTIVE FOLLOW-UP GUIDELINES:
 }
 
 /**
- * Generates the final overall evaluation, skill-gap analysis, and roadmap.
+ * Deterministic rubric evaluator enforcing ZERO-score rule on empty/irrelevant/wrong answers.
  */
-async function generateFinalEvaluation({
-  role,
-  domain,
-  difficulty,
-  companyStyle,
-  questions = [],
-  totalDurationSeconds = 0,
-}) {
-  const domainConfig = getDomainConfig(domain);
-  const companyProfile = getCompanyStyleProfile(domain, companyStyle);
-
-  // Calculate deterministic metrics from valid scores
-  const validQuestions = questions.filter((q) => q.evaluation && typeof q.evaluation.score === "number");
-  const scores = validQuestions.map((q) => q.evaluation.score);
-  const avgScoreOutOf10 = scores.length > 0
-    ? scores.reduce((sum, s) => sum + s, 0) / scores.length
-    : 5;
-  const overallPercentage = Math.round(avgScoreOutOf10 * 10);
-
-  let calculatedHireRecommendation = "Leaning Hire";
-  if (overallPercentage >= 85) calculatedHireRecommendation = "Strong Hire";
-  else if (overallPercentage >= 72) calculatedHireRecommendation = "Hire";
-  else if (overallPercentage >= 58) calculatedHireRecommendation = "Leaning Hire";
-  else if (overallPercentage >= 45) calculatedHireRecommendation = "Leaning No Hire";
-  else calculatedHireRecommendation = "No Hire";
-
-  if (isNimConfigured()) {
-    const fullTranscript = questions
-      .map((q, i) => `Q${i + 1} [${q.topic} - ${q.difficulty}]: ${q.questionText}\nCandidate Answer: ${q.candidateAnswer}\nScore: ${q.evaluation?.score || "N/A"}/10\nFeedback: ${q.evaluation?.technicalAccuracy}`)
-      .join("\n\n");
-
-    const systemPrompt = `You are the lead bar raiser and hiring committee member at ${companyStyle}.
-Domain: ${domain}
-Role: ${role}
-Difficulty Level: ${difficulty}
-Candidate Total Score: ${overallPercentage}/100
-
-Transcript of Full Interview:
-${fullTranscript}
-
-Domain Skill Categories to evaluate:
-${JSON.stringify(domainConfig.skillCategories || [])}
-
-TASK:
-Provide a rigorous, constructive, and highly actionable post-interview evaluation.
-1. Determine hire recommendation: "Strong Hire", "Hire", "Leaning Hire", "Leaning No Hire", or "No Hire".
-2. Write a concise executive summary of candidate performance.
-3. List 3 to 4 key strengths demonstrated.
-4. List 3 to 4 priority growth areas.
-5. Create a detailed Skill Gap Analysis evaluating each competency listed above with:
-   - score (0 to 100)
-   - status ("Strong", "Proficient", "Needs Work", "Critical Gap")
-   - gapDescription
-   - recommendedAction
-6. Outline a 3-step personalized preparation roadmap.
-7. NEVER use em dashes or emojis anywhere.
-8. Output in valid JSON matching this schema:
-{
-  "overallScore": ${overallPercentage},
-  "hireRecommendation": "${calculatedHireRecommendation}",
-  "summaryText": "Executive summary of interview performance",
-  "keyStrengths": ["Strength 1", "Strength 2", "Strength 3"],
-  "priorityImprovementAreas": ["Area 1", "Area 2", "Area 3"],
-  "skillGapAnalysis": [
-    {
-      "skillName": "Skill Name from list",
-      "category": "Technical",
-      "score": 75,
-      "status": "Proficient",
-      "gapDescription": "Specific gap description",
-      "recommendedAction": "Concrete action to close gap"
-    }
-  ],
-  "personalizedPreparationPlan": [
-    {
-      "step": 1,
-      "title": "Action title",
-      "action": "Detailed study action"
-    }
-  ]
-}`;
-
-    const nimResult = await callNimChatCompletion(
-      [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: "Generate the final comprehensive evaluation and skill-gap report." },
-      ],
-      { temperature: 0.3, max_tokens: 1500, jsonMode: true }
-    );
-
-    if (nimResult.success && nimResult.json && nimResult.json.summaryText) {
-      const data = nimResult.json;
-      return {
-        overallScore: Math.min(100, Math.max(0, Number(data.overallScore) || overallPercentage)),
-        hireRecommendation: data.hireRecommendation || calculatedHireRecommendation,
-        summaryText: cleanDisallowedChars(data.summaryText),
-        keyStrengths: (data.keyStrengths || []).map(cleanDisallowedChars),
-        priorityImprovementAreas: (data.priorityImprovementAreas || []).map(cleanDisallowedChars),
-        skillGapAnalysis: (data.skillGapAnalysis || []).map((item) => ({
-          skillName: cleanDisallowedChars(item.skillName || "Domain Skill"),
-          category: cleanDisallowedChars(item.category || "Technical"),
-          score: Math.min(100, Math.max(0, Number(item.score) || 70)),
-          status: item.status || "Proficient",
-          gapDescription: cleanDisallowedChars(item.gapDescription || ""),
-          recommendedAction: cleanDisallowedChars(item.recommendedAction || ""),
-        })),
-        personalizedPreparationPlan: (data.personalizedPreparationPlan || []).map((step, idx) => ({
-          step: step.step || idx + 1,
-          title: cleanDisallowedChars(step.title || `Milestone ${idx + 1}`),
-          action: cleanDisallowedChars(step.action || ""),
-        })),
-      };
-    }
-  }
-
-  // Fallback to deterministic curated final evaluation
-  return generateCuratedFinalEvaluation({
-    role,
-    domain,
-    difficulty,
-    companyStyle,
-    questions: validQuestions.length > 0 ? validQuestions : questions,
-    overallPercentage,
-    calculatedHireRecommendation,
-  });
-}
-
-/* =======================================================================
-   CURATED FALLBACK & DETERMINISTIC LOGIC
-====================================================================== */
-
-function getCuratedInitialQuestion(arg1, arg2, arg3, arg4) {
-  let domain, difficulty, companyStyle, previouslyAskedTexts, interviewType, programmingLanguage;
-
-  if (typeof arg1 === "object" && arg1 !== null) {
-    domain = arg1.domain;
-    difficulty = arg1.difficulty || "Hard";
-    companyStyle = arg1.companyStyle || "General Tech";
-    previouslyAskedTexts = arg1.previouslyAskedTexts || [];
-    interviewType = arg1.interviewType || "Mixed";
-    programmingLanguage = arg1.programmingLanguage || "javascript";
-  } else {
-    domain = arg1;
-    difficulty = arg2 || "Hard";
-    companyStyle = arg3 || "General Tech";
-    previouslyAskedTexts = arg4 || [];
-    interviewType = "Mixed";
-    programmingLanguage = "javascript";
-  }
-
-  const domainConfig = getDomainConfig(domain);
-  const companyProfile = domainConfig.companyStyles?.[companyStyle] || domainConfig.companyStyles?.["General Tech"] || {};
-
-  const eligibleQuestions = [];
-  const usedTexts = new Set((previouslyAskedTexts || []).map((t) => t.toLowerCase().trim()));
-
-  // 1. Specialized Coding Interview Mode or DSA Mode
-  if (interviewType.includes("Coding") || (interviewType.includes("Language-Specific") && arg1.dsaEnabled)) {
-    const lang = (programmingLanguage || "javascript").toLowerCase();
-    const targetTopics = Array.isArray(arg1.dsaTopics) && arg1.dsaTopics.length > 0 ? arg1.dsaTopics.map((t) => t.toLowerCase()) : [];
-    
-    let matching = CODING_PROBLEMS.filter((p) => !usedTexts.has(p.questionText.toLowerCase().trim()));
-    if (targetTopics.length > 0) {
-      const topicMatches = matching.filter((p) => targetTopics.some((t) => p.topic.toLowerCase().includes(t) || p.title.toLowerCase().includes(t)));
-      if (topicMatches.length > 0) matching = topicMatches;
-    }
-
-    const chosen = matching.length > 0 ? matching[0] : CODING_PROBLEMS[0];
-    return {
-      topic: chosen.topic,
-      subtopic: chosen.title,
-      questionType: "Coding",
-      difficulty: chosen.difficulty || difficulty,
-      programmingLanguage: lang,
-      starterCode: (chosen.starterCode && (chosen.starterCode[lang] || chosen.starterCode.javascript)) || "",
-      referenceSolution: (chosen.referenceSolution && (chosen.referenceSolution[lang] || chosen.referenceSolution.javascript)) || "",
-      hints: chosen.hints || [],
-      testCases: chosen.testCases || [],
-      questionText: cleanDisallowedChars(chosen.questionText),
-      expectedKeyPoints: chosen.expectedKeyPoints || ["O(n) time complexity", "Clean boundary handling"],
-      isFollowUp: false,
-      source: "coding-challenge-bank",
-    };
-  }
-
-  // 2. Aptitude & Reasoning Modality (Target Focus Aware)
-  if (interviewType.includes("Aptitude")) {
-    const targetCategories = Array.isArray(arg1.aptitudeFocusAreas) && arg1.aptitudeFocusAreas.length > 0
-      ? arg1.aptitudeFocusAreas.map((c) => c.toLowerCase())
-      : [];
-
-    let matching = APTITUDE_QUESTIONS.filter((q) => !usedTexts.has(q.questionText.toLowerCase().trim()));
-    if (targetCategories.length > 0) {
-      const catMatches = matching.filter((q) => targetCategories.some((c) => q.topic.toLowerCase().includes(c) || q.subtopic.toLowerCase().includes(c)));
-      if (catMatches.length > 0) matching = catMatches;
-    }
-
-    const chosen = matching.length > 0 ? matching[0] : APTITUDE_QUESTIONS[0];
-    return {
-      topic: chosen.topic,
-      subtopic: chosen.subtopic,
-      questionType: "Aptitude",
-      difficulty: chosen.difficulty || difficulty,
-      aptitudeOptions: chosen.aptitudeOptions,
-      correctOptionIndex: chosen.correctOptionIndex,
-      explanation: chosen.explanation,
-      starterCode: "",
-      referenceSolution: `Correct Answer: Option ${String.fromCharCode(65 + chosen.correctOptionIndex)}\nExplanation:\n${chosen.explanation}`,
-      hints: [
-        `Identify the fundamental formula or deduction pattern connecting the given values.`,
-        `Calculate step by step to verify logical consistency.`,
-      ],
-      questionText: cleanDisallowedChars(chosen.questionText),
-      expectedKeyPoints: chosen.expectedKeyPoints || ["Correct mathematical deduction"],
-      isFollowUp: false,
-      source: "aptitude-knowledge-bank",
-    };
-  }
-
-  // 3. Language-Specific Technical Modality
-  if (interviewType.includes("Language-Specific") || interviewType.includes("Language-specific")) {
-    const lang = (programmingLanguage || "javascript").toLowerCase();
-    const langPool = LANGUAGE_QUESTIONS[lang] || LANGUAGE_QUESTIONS.javascript;
-    const available = langPool.filter((q) => !usedTexts.has(q.questionText.toLowerCase().trim()));
-    if (available.length > 0) {
-      const chosen = available[0];
-      return {
-        topic: chosen.topic,
-        subtopic: chosen.subtopic,
-        questionType: "Technical",
-        difficulty: chosen.difficulty || difficulty,
-        programmingLanguage: lang,
-        starterCode: "",
-        referenceSolution: `Reference Benchmark for ${chosen.topic}:\n- Key Points: ${(chosen.expectedKeyPoints || []).join("; ")}`,
-        hints: [
-          `Consider how ${lang} handles memory layout and execution order internally.`,
-          `Analyze concurrency primitives and runtime overhead.`,
-        ],
-        questionText: cleanDisallowedChars(chosen.questionText),
-        expectedKeyPoints: chosen.expectedKeyPoints,
-        isFollowUp: false,
-        source: "language-internals-bank",
-      };
-    }
-  }
-
-  // 4. Gather all potential questions for standard and domain modalities
-  if (difficulty === "Hard") {
-    if (companyProfile && companyProfile.keyQuestionsHard) {
-      companyProfile.keyQuestionsHard.forEach((q) => eligibleQuestions.push({ ...q, companyStyle }));
-    }
-    if (domainConfig.companyStyles) {
-      Object.keys(domainConfig.companyStyles).forEach((c) => {
-        if (c !== companyStyle && domainConfig.companyStyles[c].keyQuestionsHard) {
-          domainConfig.companyStyles[c].keyQuestionsHard.forEach((q) => eligibleQuestions.push({ ...q, companyStyle: c }));
-        }
-      });
-    }
-    if (domainConfig.mediumQuestions) {
-      domainConfig.mediumQuestions.forEach((q) => eligibleQuestions.push(q));
-    }
-    if (domainConfig.easyQuestions) {
-      domainConfig.easyQuestions.forEach((q) => eligibleQuestions.push(q));
-    }
-  } else if (difficulty === "Medium") {
-    if (domainConfig.mediumQuestions) {
-      domainConfig.mediumQuestions.forEach((q) => eligibleQuestions.push(q));
-    }
-    if (domainConfig.easyQuestions) {
-      domainConfig.easyQuestions.forEach((q) => eligibleQuestions.push(q));
-    }
-    if (domainConfig.companyStyles) {
-      Object.keys(domainConfig.companyStyles).forEach((c) => {
-        if (domainConfig.companyStyles[c].keyQuestionsHard) {
-          domainConfig.companyStyles[c].keyQuestionsHard.forEach((q) => eligibleQuestions.push({ ...q, companyStyle: c }));
-        }
-      });
-    }
-  } else {
-    if (domainConfig.easyQuestions) {
-      domainConfig.easyQuestions.forEach((q) => eligibleQuestions.push(q));
-    }
-    if (domainConfig.mediumQuestions) {
-      domainConfig.mediumQuestions.forEach((q) => eligibleQuestions.push(q));
-    }
-  }
-
-  // 2. Filter out all previously asked questions
-  const freshQuestions = eligibleQuestions.filter(
-    (q) => !usedTexts.has(q.questionText.toLowerCase().trim())
-  );
-
-  if (freshQuestions.length > 0) {
-    const chosen = freshQuestions[Math.floor(Math.random() * freshQuestions.length)];
-    const refSolution = chosen.referenceSolution || `Reference Benchmark for ${chosen.topic}:\n- Expected Core Points:\n  * ${(chosen.expectedKeyPoints || ["High availability", "Fault isolation", "Trade-off analysis"]).join("\n  * ")}\n- Key Architectural Considerations: Address operational complexity, latency percentiles (P99), failure modes, and recovery time objectives (RTO).`;
-    const defaultHints = Array.isArray(chosen.hints) && chosen.hints.length > 0 ? chosen.hints : [
-      `Consider how system load, data partitioning, and failure recovery interact in this scenario.`,
-      `Compare at least two distinct implementation approaches and articulate their trade-offs.`,
-    ];
-
-    return {
-      topic: chosen.topic,
-      subtopic: chosen.subtopic || "Domain Practice",
-      questionType: chosen.questionType || "Technical",
-      difficulty: chosen.difficulty || difficulty,
-      starterCode: chosen.starterCode || "",
-      referenceSolution: refSolution,
-      hints: defaultHints,
-      questionText: cleanDisallowedChars(chosen.questionText),
-      expectedKeyPoints: (chosen.expectedKeyPoints || []).map(cleanDisallowedChars),
-      source: "curated-knowledge-base",
-    };
-  }
-
-  // 3. Dynamic Procedural Generation if every curated question was previously used
-  const domainSkills = domainConfig.skillCategories || ["System Architecture", "API Design", "Data Modeling"];
-  const topicChosen = domainSkills[Math.floor(Math.random() * domainSkills.length)];
-  const seedId = Math.floor(1000 + Math.random() * 9000);
-
-  return {
-    topic: topicChosen,
-    subtopic: "High Availability & Scalability",
-    questionType: "System Design",
-    difficulty,
-    starterCode: "",
-    referenceSolution: `Reference Architecture for ${topicChosen}:\n- Active-Active multi-region replication\n- Distributed rate limiting and circuit breakers\n- Asynchronous queue decoupling via Kafka\n- Observability with distributed tracing and metric alarms`,
-    hints: [
-      `Analyze how to isolate failure domains across multiple geographic zones.`,
-      `Consider using an asynchronous message broker to buffer high-throughput spikes.`,
-    ],
-    questionText: `In the context of ${topicChosen} (Scenario ID ${seedId}) within ${domain}, how would you architect a fault-tolerant solution that gracefully handles sudden network partitions and regional database failovers without data loss?`,
-    expectedKeyPoints: ["Fault isolation patterns", "Data reconciliation strategies", "Observability metrics"],
-    source: "curated-knowledge-base",
-  };
-}
-
 function evaluateAnswerCurated({
   domain,
   role,
@@ -729,19 +715,17 @@ function evaluateAnswerCurated({
   const cleanAnswer = cleanDisallowedChars(candidateAnswer || "").trim();
   const lowerAnswer = cleanAnswer.toLowerCase();
   const words = cleanAnswer.split(/\s+/).filter(Boolean);
-  const wordCount = words.length;
 
   // 1. Aptitude & Reasoning Evaluation
   if (currentQuestion.questionType === "Aptitude" && typeof currentQuestion.correctOptionIndex === "number") {
-    const optLetter = String.fromCharCode(65 + currentQuestion.correctOptionIndex); // "A", "B", "C", "D"
+    const optLetter = String.fromCharCode(65 + currentQuestion.correctOptionIndex);
     const correctOptText = (currentQuestion.aptitudeOptions?.[currentQuestion.correctOptionIndex] || "").toLowerCase();
     const isCorrect = lowerAnswer.startsWith(optLetter.toLowerCase()) ||
                       lowerAnswer.includes(`option ${optLetter.toLowerCase()}`) ||
                       lowerAnswer.includes(optLetter.toLowerCase() + ".") ||
                       (correctOptText && lowerAnswer.includes(correctOptText.slice(3).trim()));
 
-    const score = isCorrect ? 10 : 2;
-    const shouldAskFollowUp = false;
+    const score = isCorrect ? 10 : 0; // ZERO score on incorrect choice
 
     let nextQ = null;
     if (questionIndex + 1 < totalPlanned) {
@@ -761,6 +745,8 @@ function evaluateAnswerCurated({
       isValidAnswer: true,
       evaluation: {
         score,
+        relevant: true,
+        technicallyMeaningful: true,
         technicalAccuracy: isCorrect
           ? `Correct. Option ${optLetter} is the mathematically sound solution.`
           : `Incorrect option selected. Correct answer is Option ${optLetter}.`,
@@ -768,7 +754,7 @@ function evaluateAnswerCurated({
           ? "Accurate logical deduction and formula application."
           : "Mathematical or deduction discrepancy identified.",
         communicationClarity: "Direct option selection.",
-        strengths: isCorrect ? ["Accurate calculation and reasoning logic."] : ["Attempted analytical problem."],
+        strengths: isCorrect ? ["Accurate calculation and reasoning logic."] : [],
         improvements: isCorrect
           ? ["Maintain speed and accuracy under timed conditions."]
           : ["Review step-by-step mathematical derivation."],
@@ -781,7 +767,7 @@ function evaluateAnswerCurated({
     };
   }
 
-  // 2. Coding Challenge Evaluation (Evidence-Based Grading)
+  // 2. Coding Challenge Evaluation
   if (currentQuestion.questionType === "Coding") {
     const rawStarter = (currentQuestion.starterCode || "").replace(/\s+/g, "");
     const rawAnswer = cleanAnswer.replace(/\s+/g, "");
@@ -805,11 +791,13 @@ function evaluateAnswerCurated({
       return {
         isValidAnswer: true,
         evaluation: {
-          score: 1,
+          score: 0,
+          relevant: false,
+          technicallyMeaningful: false,
           technicalAccuracy: "Starter code submitted without algorithmic implementation.",
           reasoning: "The candidate submitted the unedited scaffolding template without adding logic.",
           communicationClarity: "No solution implemented.",
-          strengths: ["Template loaded."],
+          strengths: [],
           improvements: ["Write the complete algorithm and verify test cases before submission."],
           keyMissedPoints: ["Core algorithm implementation", "Return values", "Edge case handling"],
           suggestedModelAnswer: currentQuestion.referenceSolution || "Implement the solution using appropriate data structures.",
@@ -820,101 +808,38 @@ function evaluateAnswerCurated({
       };
     }
 
-    // Evaluate code execution & algorithmic complexity
-    const lang = (currentQuestion.programmingLanguage || "javascript").toLowerCase();
-    const testCases = Array.isArray(currentQuestion.testCases) ? currentQuestion.testCases : [];
-    let passedCount = 0;
-    let totalTests = testCases.length || 1;
-    let syntaxValid = true;
-    let executionNote = "";
-
-    if (lang === "javascript") {
-      try {
-        const vm = require("vm");
-        const sandbox = { console: { log: () => {} } };
-        const context = vm.createContext(sandbox);
-        const script = new vm.Script(cleanAnswer, { timeout: 1000 });
-        script.runInContext(context);
-
-        // Verification tests
-        if (cleanAnswer.includes("twoSum")) {
-          totalTests = 3;
-          try {
-            const res1 = vm.runInContext("twoSum([2,7,11,15], 9)", context);
-            if (Array.isArray(res1) && res1.length === 2 && ((res1[0] === 0 && res1[1] === 1) || (res1[0] === 1 && res1[1] === 0))) passedCount++;
-          } catch (e) {}
-          try {
-            const res2 = vm.runInContext("twoSum([3,2,4], 6)", context);
-            if (Array.isArray(res2) && res2.length === 2 && ((res2[0] === 1 && res2[1] === 2) || (res2[0] === 2 && res2[1] === 1))) passedCount++;
-          } catch (e) {}
-          try {
-            const res3 = vm.runInContext("twoSum([3,3], 6)", context);
-            if (Array.isArray(res3) && res3.length === 2 && ((res3[0] === 0 && res3[1] === 1) || (res3[0] === 1 && res3[1] === 0))) passedCount++;
-          } catch (e) {}
-        } else if (cleanAnswer.includes("merge")) {
-          totalTests = 1;
-          try {
-            const res1 = vm.runInContext("merge([[1,3],[2,6],[8,10],[15,18]])", context);
-            if (Array.isArray(res1) && res1.length === 3) passedCount++;
-          } catch (e) {}
-        } else {
-          passedCount = totalTests;
-        }
-        executionNote = `${passedCount}/${totalTests} test cases passed.`;
-      } catch (err) {
-        syntaxValid = false;
-        passedCount = 0;
-        executionNote = `Runtime Syntax Error: ${err.message}`;
-      }
-    } else {
-      const hasKeywords = lowerAnswer.includes("def ") || lowerAnswer.includes("class ") || lowerAnswer.includes("select ") || lowerAnswer.includes("for ") || lowerAnswer.includes("while ");
-      const hasReturn = lowerAnswer.includes("return") || lowerAnswer.includes("select");
-      syntaxValid = hasKeywords && hasReturn && cleanAnswer.length >= 35;
-      passedCount = syntaxValid ? totalTests : 0;
-      executionNote = syntaxValid ? "Static syntax structure verified." : "Incomplete function or query syntax.";
-    }
-
-    let score = 2;
     const isOptimal = lowerAnswer.includes("map") || lowerAnswer.includes("dict") || lowerAnswer.includes("hash") || lowerAnswer.includes("set") || lowerAnswer.includes("seen");
+    const hasComplexity = lowerAnswer.includes("o(n)") || lowerAnswer.includes("o(1)") || lowerAnswer.includes("linear");
+    const isSpokenExplanation = words.length >= 8 && (lowerAnswer.includes("approach") || lowerAnswer.includes("iterate") || lowerAnswer.includes("loop") || isOptimal);
 
-    if (syntaxValid && passedCount === totalTests && isOptimal) {
+    let score = 0;
+    if (isSpokenExplanation && isOptimal && hasComplexity) {
       score = 9;
-    } else if (syntaxValid && passedCount === totalTests) {
+    } else if (isSpokenExplanation && isOptimal) {
       score = 8;
-    } else if (syntaxValid && passedCount > 0) {
-      score = 5;
-    } else if (syntaxValid) {
-      score = 3;
+    } else if (isSpokenExplanation && (lowerAnswer.includes("two pointer") || lowerAnswer.includes("sort"))) {
+      score = 6;
+    } else if (isSpokenExplanation) {
+      score = 4;
     } else {
-      score = 2;
-    }
-
-    const strengths = [];
-    const improvements = [];
-    if (score >= 7) {
-      strengths.push("Provided executable algorithmic logic with structured control flow.");
-      strengths.push("Passed test assertions with clean time complexity bounds.");
-    } else if (score >= 4) {
-      strengths.push("Formulated an initial algorithmic outline.");
-      improvements.push("Handle boundary edge cases and check function return formats.");
-    } else {
-      improvements.push("Fix runtime errors and implement complete algorithmic logic.");
-      improvements.push(executionNote);
+      score = 0;
     }
 
     return {
       isValidAnswer: true,
       evaluation: {
         score,
+        relevant: score > 0,
+        technicallyMeaningful: score > 0,
         technicalAccuracy: score >= 7
-          ? `Solid algorithmic solution (${executionNote}). Meets target complexity bounds.`
-          : `Execution failed or incomplete (${executionNote}).`,
-        reasoning: "Evaluated against runtime assertion sandbox.",
-        communicationClarity: "Code structure and variable annotations.",
-        strengths,
-        improvements,
-        keyMissedPoints: score < 7 ? ["Edge case verification", "Full test case execution"] : [],
-        suggestedModelAnswer: `Optimal algorithmic solution achieves O(n) runtime with auxiliary space bounds.`,
+          ? "Solid algorithmic solution meeting target complexity bounds."
+          : (score > 0 ? "Partial algorithmic reasoning articulated." : "Code did not solve the algorithmic problem."),
+        reasoning: "Evaluated against algorithmic complexity and data structure criteria.",
+        communicationClarity: "Algorithmic logic structure.",
+        strengths: score >= 7 ? ["Articulated sound algorithmic approach and data structure selection."] : [],
+        improvements: score < 7 ? ["Formulate optimal O(n) algorithmic approach using Hash Maps or two pointers."] : [],
+        keyMissedPoints: score < 7 ? ["Optimal time complexity", "Auxiliary space bounds"] : [],
+        suggestedModelAnswer: currentQuestion.referenceSolution || "Optimal algorithm achieves O(n) time complexity.",
       },
       isFollowUp: false,
       isCompleted: questionIndex + 1 >= totalPlanned,
@@ -922,7 +847,71 @@ function evaluateAnswerCurated({
     };
   }
 
-  // 3. Technical, Architecture, HR/Behavioral, and System Design Evaluation
+  // 3. Behavioral & Situational HR Evaluation (STAR Methodology, Non-Technical)
+  if (currentQuestion.questionType === "Behavioral") {
+    const behavioralStrengths = [];
+    const behavioralImprovements = [];
+
+    const hasOwnership = lowerAnswer.includes("i ") || lowerAnswer.includes("my ") || lowerAnswer.includes("decided") || lowerAnswer.includes("resolved") || lowerAnswer.includes("organized") || lowerAnswer.includes("facilitated") || lowerAnswer.includes("took ownership");
+    const hasCollaboration = lowerAnswer.includes("team") || lowerAnswer.includes("colleague") || lowerAnswer.includes("stakeholder") || lowerAnswer.includes("partner") || lowerAnswer.includes("discussed") || lowerAnswer.includes("aligned") || lowerAnswer.includes("listened");
+    const hasOutcome = lowerAnswer.includes("result") || lowerAnswer.includes("outcome") || lowerAnswer.includes("learned") || lowerAnswer.includes("prevent") || lowerAnswer.includes("improved") || lowerAnswer.includes("delivered") || lowerAnswer.includes("completed");
+
+    let bScore = 0;
+    if (words.length < 15) {
+      bScore = 0;
+      behavioralImprovements.push("Use the STAR format (Situation, Task, Action, Result) to provide a complete response.");
+    } else if (hasOwnership && hasCollaboration && hasOutcome && words.length >= 35) {
+      bScore = 9;
+      behavioralStrengths.push("Excellent STAR decomposition with clear personal ownership, collaboration, and measurable outcomes.");
+    } else if (hasOwnership && (hasCollaboration || hasOutcome) && words.length >= 25) {
+      bScore = 7;
+      behavioralStrengths.push("Good situational ownership and constructive resolution.");
+      behavioralImprovements.push("Elaborate on the long-term post-resolution outcome and retrospective takeaways.");
+    } else if (hasOwnership || hasCollaboration) {
+      bScore = 5;
+      behavioralImprovements.push("Structure your answer to explicitly describe the Action you personally took and the final Result achieved.");
+    } else {
+      bScore = 0;
+      behavioralImprovements.push("Focus on describing a specific workplace scenario and your direct personal actions.");
+    }
+
+    let nextQ = null;
+    if (questionIndex + 1 < totalPlanned) {
+      nextQ = getNextCuratedOrGeneratedQuestion({
+        domain,
+        role,
+        difficulty,
+        companyStyle,
+        interviewType: "HR & Behavioral",
+        questionIndex: questionIndex + 1,
+        totalPlanned,
+        previousQuestions: [...previousQuestions, currentQuestion],
+      });
+    }
+
+    return {
+      isValidAnswer: true,
+      evaluation: {
+        score: bScore,
+        relevant: bScore > 0,
+        technicallyMeaningful: true,
+        technicalAccuracy: bScore >= 7
+          ? "Strong behavioral response with sound professional judgment and structured communication."
+          : (bScore > 0 ? "Addressed the scenario with partial STAR structure." : "Response lacked concrete situational ownership."),
+        reasoning: "Evaluated against situational ownership, collaboration, and STAR framework criteria.",
+        communicationClarity: "Evaluated on empathetic phrasing and executive clarity.",
+        strengths: behavioralStrengths,
+        improvements: behavioralImprovements,
+        keyMissedPoints: bScore < 7 ? ["Explicit STAR result/outcome", "Specific personal action taken"] : [],
+        suggestedModelAnswer: "High standard response frames the Situation concisely, describes personal Action clearly, and quantifies the Result and key learning.",
+      },
+      isFollowUp: bScore < 5,
+      isCompleted: questionIndex + 1 >= totalPlanned,
+      nextQuestion: nextQ,
+    };
+  }
+
+  // 4. Technical, Architecture, and System Design Evaluation
   const expectedKeyPoints = Array.isArray(currentQuestion.expectedKeyPoints)
     ? currentQuestion.expectedKeyPoints
     : [];
@@ -942,7 +931,7 @@ function evaluateAnswerCurated({
       if (lowerAnswer.includes(kw)) matchCount++;
     });
 
-    const isMatched = pointKeywords.length > 0 && (matchCount / pointKeywords.length >= 0.4 || matchCount >= 2);
+    const isMatched = pointKeywords.length > 0 && (matchCount / pointKeywords.length >= 0.35 || matchCount >= 2);
     if (isMatched) {
       matchedKeyPoints.push(point);
     } else {
@@ -950,68 +939,69 @@ function evaluateAnswerCurated({
     }
   });
 
-  const technicalIndicators = [
-    "trade-off", "tradeoff", "latency", "throughput", "concurrency", "distributed",
-    "consistency", "partition", "failover", "cache", "index", "complexity",
-    "availability", "scalability", "metric", "monitoring", "alert", "security",
-    "idempotent", "replication", "asynchronous", "synchronous", "queue", "worker",
-    "situation", "action", "result", "ownership", "conflict", "stakeholder", "resolved"
-  ];
-  let techKeywordMatches = 0;
-  technicalIndicators.forEach((ti) => {
-    if (lowerAnswer.includes(ti)) techKeywordMatches++;
+  // Relevance Check against Question Context
+  const qKeywords = (currentQuestion.questionText + " " + currentQuestion.topic)
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, "")
+    .split(/\s+/)
+    .filter((w) => w.length > 4 && !["what", "which", "where", "how", "would", "explain", "describe"].includes(w));
+
+  let qKeywordMatches = 0;
+  qKeywords.forEach((kw) => {
+    if (lowerAnswer.includes(kw)) qKeywordMatches++;
   });
 
-  let rawScore = 3;
-  if (matchedKeyPoints.length === 0) {
-    if (wordCount < 30 || techKeywordMatches === 0) {
-      rawScore = 2;
-    } else {
-      rawScore = 3;
-    }
+  // Programmatic Keyword Dump & Disconnected Token Detector
+  const predicateVerbs = [
+    "is", "are", "was", "were", "be", "been", "being", "have", "has", "had", "do", "does", "did",
+    "can", "could", "should", "would", "will", "may", "might", "must",
+    "use", "uses", "using", "used", "implement", "implements", "implementing", "design", "designs",
+    "handles", "handled", "handling", "fails", "failing", "failed", "store", "stores", "storing",
+    "replicate", "replicating", "replicated", "process", "processes", "processing", "send", "sends",
+    "receive", "receives", "synchronize", "synchronizing", "ensure", "ensuring", "mitigate",
+    "track", "tracking", "reject", "rejecting", "mix", "bake", "make", "makes", "hit", "hits",
+    "drop", "drops", "block", "blocked", "run", "runs", "set", "sets", "get", "gets", "put",
+    "keep", "keeps", "take", "takes", "write", "read", "call", "check", "need", "work"
+  ];
+  const connectingWords = ["with", "to", "for", "by", "in", "when", "if", "because", "that", "and", "so", "as", "from", "on", "across", "between", "of", "into", "it"];
+  const lowerClean = cleanAnswer.toLowerCase();
+  const predicateMatches = predicateVerbs.filter((v) => new RegExp(`\\b${v}\\b`, "i").test(lowerClean)).length;
+  const connectorMatches = connectingWords.filter((w) => new RegExp(`\\b${w}\\b`, "i").test(lowerClean)).length;
+  const isKeywordDump = words.length >= 8 && (predicateMatches === 0 || connectorMatches === 0);
+
+  // Strict Zero-Score Gate in Fallback
+  let score = 0;
+  if (isKeywordDump || (matchedKeyPoints.length === 0 && qKeywordMatches === 0)) {
+    score = 0; // Zero marks for completely unrelated, empty, or keyword dump text
+  } else if (matchedKeyPoints.length === 0) {
+    score = 0; // Keyword mentions alone without matching expected concepts receive ZERO
   } else if (matchedKeyPoints.length === 1) {
-    rawScore = wordCount > 60 ? 5 : 4;
+    score = 4; // Partial credit for genuine partial understanding
   } else if (matchedKeyPoints.length === 2) {
-    rawScore = wordCount > 100 && techKeywordMatches >= 2 ? 7 : 6;
+    // If brief incomplete answer, cap at partial credit (5)
+    score = words.length < 30 ? 5 : 7;
   } else if (matchedKeyPoints.length >= 3) {
-    rawScore = wordCount > 140 && techKeywordMatches >= 3 ? 9 : 8;
+    score = words.length < 35 ? 6 : 9;
   }
 
-  if (difficulty === "Hard" && rawScore > 6 && matchedKeyPoints.length < 2) {
-    rawScore = Math.max(4, rawScore - 1);
-  }
-
-  const score = Math.min(10, Math.max(1, rawScore));
   const strengths = [];
   const improvements = [];
 
-  if (matchedKeyPoints.length > 0) {
+  if (score >= 4 && matchedKeyPoints.length > 0) {
     strengths.push(`Directly addressed key requirement: ${matchedKeyPoints[0]}`);
     if (matchedKeyPoints.length > 1) {
-      strengths.push(`Demonstrated good coverage on: ${matchedKeyPoints[1]}`);
+      strengths.push(`Demonstrated coverage on: ${matchedKeyPoints[1]}`);
     }
-  } else {
-    strengths.push("Provided a conceptual starting point for the scenario.");
-  }
-
-  if (techKeywordMatches >= 2) {
-    strengths.push("Used precise domain terminology to describe system behaviors.");
   }
 
   if (missedKeyPoints.length > 0) {
-    improvements.push(`Deepen trade-off analysis around: ${missedKeyPoints[0]}`);
+    improvements.push(`Deepen technical analysis around: ${missedKeyPoints[0]}`);
     if (missedKeyPoints.length > 1) {
-      improvements.push(`Include concrete edge-case mitigation for: ${missedKeyPoints[1]}`);
+      improvements.push(`Include concrete implementation details for: ${missedKeyPoints[1]}`);
     }
-  } else {
-    improvements.push("Consider explicitly quantifying operational latencies (p95/p99) and failure budgets.");
+  } else if (score === 0) {
+    improvements.push(`Focus your answer directly on addressing the scenario: "${currentQuestion.questionText}"`);
   }
-
-  if (wordCount < 60) {
-    improvements.push("Elaborate with a more complete step-by-step structural breakdown.");
-  }
-
-  const shouldAskFollowUp = score < 6 && questionIndex + 1 < totalPlanned && !currentQuestion.isFollowUp;
 
   let nextQ = null;
   if (questionIndex + 1 < totalPlanned) {
@@ -1023,197 +1013,159 @@ function evaluateAnswerCurated({
       questionIndex: questionIndex + 1,
       totalPlanned,
       previousQuestions: [...previousQuestions, currentQuestion],
-      isFollowUp: shouldAskFollowUp,
+      isFollowUp: score < 5,
       parentTopic: currentQuestion.topic,
     });
   }
 
-  let technicalAccuracyFeedback = "";
+  let technicalAccuracy = "";
   if (score >= 8) {
-    technicalAccuracyFeedback = "Strong technical grasp. Covered core failure modes and architectural trade-offs comprehensively.";
+    technicalAccuracy = "Strong technical grasp. Covered core failure modes and architectural trade-offs comprehensively.";
   } else if (score >= 6) {
-    technicalAccuracyFeedback = "Solid foundational approach. Addressed key concepts with room for deeper operational precision.";
+    technicalAccuracy = "Solid foundational approach. Addressed key concepts with room for deeper operational precision.";
   } else if (score >= 4) {
-    technicalAccuracyFeedback = "Partial technical understanding. Key architectural considerations and edge-case handling were omitted.";
+    technicalAccuracy = "Partial technical understanding. Key architectural considerations and edge-case handling were omitted.";
   } else {
-    technicalAccuracyFeedback = "Insufficient technical depth. The response lacked required architectural mechanisms and domain specifics.";
+    technicalAccuracy = "The response did not demonstrate valid technical reasoning for this scenario.";
   }
 
   return {
     isValidAnswer: true,
     evaluation: {
       score,
-      technicalAccuracy: technicalAccuracyFeedback,
-      reasoning: score >= 6
-        ? "Demonstrated logical problem decomposition with clear cause-and-effect reasoning."
-        : "Reasoning remained high-level without structured trade-off comparisons.",
-      communicationClarity: wordCount >= 50
-        ? "Clear and articulated structure."
-        : "Concise. Could benefit from a more thorough step-by-step breakdown.",
+      relevant: score > 0,
+      technicallyMeaningful: score > 0,
+      technicalAccuracy,
+      reasoning: score > 0 ? "Technical reasoning analyzed." : "No valid technical reasoning demonstrated.",
+      communicationClarity: "Analyzed based on clarity of concepts.",
       strengths,
       improvements,
-      keyMissedPoints: missedKeyPoints.length > 0 ? missedKeyPoints : ["Detailed failure recovery considerations"],
-      suggestedModelAnswer: `For a top-tier answer in ${domain}, articulate the architectural design, quantify time and space complexity or operational latency, and compare at least two distinct approaches with concrete trade-offs.`,
+      keyMissedPoints: missedKeyPoints.slice(0, 3),
+      suggestedModelAnswer: currentQuestion.referenceSolution || "Address the core architectural trade-offs and operational failure modes.",
     },
-    isFollowUp: shouldAskFollowUp,
+    isFollowUp: score < 5,
     isCompleted: questionIndex + 1 >= totalPlanned,
     nextQuestion: nextQ,
   };
 }
 
-function getNextCuratedOrGeneratedQuestion({
-  domain,
+/**
+ * Generates the final overall evaluation, skill-gap analysis, and roadmap.
+ */
+async function generateFinalEvaluation({
   role,
+  domain,
   difficulty,
   companyStyle,
-  interviewType = "Mixed",
-  programmingLanguage = "javascript",
-  questionIndex,
-  totalPlanned,
-  previousQuestions = [],
-  isFollowUp = false,
-  parentTopic = "",
+  questions = [],
+  totalDurationSeconds = 0,
 }) {
   const domainConfig = getDomainConfig(domain);
+  const companyProfile = getCompanyStyleProfile(domain, companyStyle);
 
-  // Coding Interview Progression
-  if (interviewType === "Coding Interview" || interviewType === "AI Coding Interview") {
-    const lang = (programmingLanguage || "javascript").toLowerCase();
-    const usedTexts = new Set(previousQuestions.map((q) => q.questionText.toLowerCase().trim()));
-    const available = CODING_PROBLEMS.filter((p) => !usedTexts.has(p.questionText.toLowerCase().trim()));
-    if (available.length > 0) {
-      const chosen = available[0];
+  const validQuestions = questions.filter((q) => q.evaluation && typeof q.evaluation.score === "number");
+  const scores = validQuestions.map((q) => q.evaluation.score);
+  const avgScoreOutOf10 = scores.length > 0
+    ? scores.reduce((sum, s) => sum + s, 0) / scores.length
+    : 0;
+  const overallPercentage = Math.round(avgScoreOutOf10 * 10);
+
+  let calculatedHireRecommendation = "No Hire";
+  if (overallPercentage >= 85) calculatedHireRecommendation = "Strong Hire";
+  else if (overallPercentage >= 70) calculatedHireRecommendation = "Hire";
+  else if (overallPercentage >= 50) calculatedHireRecommendation = "Leaning Hire";
+  else calculatedHireRecommendation = "No Hire";
+
+  if (isAiConfigured()) {
+    const fullTranscript = questions
+      .map((q, i) => `Q${i + 1} [${q.topic} - ${q.difficulty}]: ${q.questionText}\nCandidate Answer: ${q.candidateAnswer}\nScore: ${q.evaluation?.score || 0}/10\nFeedback: ${q.evaluation?.technicalAccuracy}`)
+      .join("\n\n");
+
+    const systemPrompt = `You are the lead bar raiser and hiring committee member at ${companyStyle}.
+Domain: ${domain}
+Role: ${role}
+Difficulty Level: ${difficulty}
+Candidate Total Score: ${overallPercentage}/100
+
+Transcript of Full Interview:
+${fullTranscript}
+
+TASK:
+Provide a rigorous post-interview evaluation report.
+1. Determine hire recommendation: "Strong Hire", "Hire", "Leaning Hire", or "No Hire".
+2. Write a concise executive summary of candidate performance.
+3. List 3 to 4 key strengths demonstrated.
+4. List 3 priority improvement areas.
+
+Output valid JSON matching this schema (NO em dashes, NO emojis):
+{
+  "overallScore": ${overallPercentage},
+  "hireRecommendation": "${calculatedHireRecommendation}",
+  "summaryText": "Executive summary of performance",
+  "keyStrengths": ["Strength 1", "Strength 2"],
+  "priorityImprovementAreas": ["Area 1", "Area 2"],
+  "skillGapAnalysis": [
+    {
+      "skillName": "System Architecture",
+      "category": "Technical",
+      "score": ${overallPercentage},
+      "status": "Proficient",
+      "gapDescription": "Description of gap"
+    }
+  ],
+  "learningRoadmap": [
+    {
+      "phase": "Phase 1",
+      "title": "Action title",
+      "action": "Detailed study action"
+    }
+  ]
+}`;
+
+    const nimResult = await callAiChatCompletion({
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: "Generate the final comprehensive evaluation and skill-gap report." },
+      ],
+      temperature: 0.3,
+      maxTokens: 1500,
+      jsonMode: true,
+    });
+
+    if (nimResult.success && nimResult.json && nimResult.json.summaryText) {
+      const data = nimResult.json;
       return {
-        topic: chosen.topic,
-        subtopic: chosen.title,
-        questionType: "Coding",
-        difficulty: chosen.difficulty || difficulty,
-        programmingLanguage: lang,
-        starterCode: (chosen.starterCode && (chosen.starterCode[lang] || chosen.starterCode.javascript)) || "",
-        referenceSolution: (chosen.referenceSolution && (chosen.referenceSolution[lang] || chosen.referenceSolution.javascript)) || "",
-        hints: chosen.hints || [],
-        testCases: chosen.testCases || [],
-        questionText: cleanDisallowedChars(chosen.questionText),
-        expectedKeyPoints: chosen.expectedKeyPoints,
-        isFollowUp: false,
-        source: "coding-challenge-bank",
+        overallScore: Math.min(100, Math.max(0, Number(data.overallScore) || overallPercentage)),
+        hireRecommendation: data.hireRecommendation || calculatedHireRecommendation,
+        summaryText: cleanDisallowedChars(data.summaryText),
+        keyStrengths: (data.keyStrengths || []).map(cleanDisallowedChars),
+        priorityImprovementAreas: (data.priorityImprovementAreas || []).map(cleanDisallowedChars),
+        skillGapAnalysis: (data.skillGapAnalysis || []).map((item) => ({
+          skillName: cleanDisallowedChars(item.skillName || "Domain Skill"),
+          category: cleanDisallowedChars(item.category || "Technical"),
+          score: Math.min(100, Math.max(0, Number(item.score) || overallPercentage)),
+          status: cleanDisallowedChars(item.status || "Assessed"),
+          gapDescription: cleanDisallowedChars(item.gapDescription || ""),
+        })),
+        learningRoadmap: (data.learningRoadmap || []).map((item) => ({
+          phase: cleanDisallowedChars(item.phase || "Phase 1"),
+          title: cleanDisallowedChars(item.title || "Target Area"),
+          action: cleanDisallowedChars(item.action || "Study core concepts"),
+        })),
       };
     }
   }
 
-  // Aptitude & Reasoning Progression
-  if (interviewType.includes("Aptitude")) {
-    const usedTexts = new Set(previousQuestions.map((q) => q.questionText.toLowerCase().trim()));
-    const available = APTITUDE_QUESTIONS.filter((q) => !usedTexts.has(q.questionText.toLowerCase().trim()));
-    if (available.length > 0) {
-      const chosen = available[0];
-      return {
-        topic: chosen.topic,
-        subtopic: chosen.subtopic,
-        questionType: "Aptitude",
-        difficulty: chosen.difficulty || difficulty,
-        aptitudeOptions: chosen.aptitudeOptions,
-        correctOptionIndex: chosen.correctOptionIndex,
-        explanation: chosen.explanation,
-        questionText: cleanDisallowedChars(chosen.questionText),
-        expectedKeyPoints: chosen.expectedKeyPoints,
-        isFollowUp: false,
-        source: "aptitude-knowledge-bank",
-      };
-    }
-  }
-
-  // Language-Specific Technical Progression
-  if (interviewType.includes("Language-Specific") || interviewType.includes("Language-specific")) {
-    const lang = (programmingLanguage || "javascript").toLowerCase();
-    const langPool = LANGUAGE_QUESTIONS[lang] || LANGUAGE_QUESTIONS.javascript;
-    const usedTexts = new Set(previousQuestions.map((q) => q.questionText.toLowerCase().trim()));
-    const available = langPool.filter((q) => !usedTexts.has(q.questionText.toLowerCase().trim()));
-    if (available.length > 0) {
-      const chosen = available[0];
-      return {
-        topic: chosen.topic,
-        subtopic: chosen.subtopic,
-        questionType: "Technical",
-        difficulty: chosen.difficulty || difficulty,
-        programmingLanguage: lang,
-        questionText: cleanDisallowedChars(chosen.questionText),
-        expectedKeyPoints: chosen.expectedKeyPoints,
-        isFollowUp: false,
-        source: "language-internals-bank",
-      };
-    }
-  }
-
-  if (isFollowUp) {
-    return {
-      topic: parentTopic || "Deep Dive",
-      subtopic: "Operational Edge Cases",
-      questionType: "Situational",
-      difficulty,
-      questionText: `Following up on that, what specific metrics, monitoring alerts, or failure recovery mechanisms would you establish to detect degradation in that flow before users are impacted?`,
-      expectedKeyPoints: ["p95/p99 latency percentiles", "Error rate budgets and saturation alerts", "Synthetic testing probes"],
-      isFollowUp: true,
-      followUpReason: "Probing operational monitoring depth and failure recovery.",
-      source: "curated-knowledge-base",
-    };
-  }
-
-  const allDomainQuestions = [];
-  if (difficulty === "Hard") {
-    if (domainConfig.companyStyles) {
-      Object.keys(domainConfig.companyStyles).forEach((cName) => {
-        const comp = domainConfig.companyStyles[cName];
-        if (comp.keyQuestionsHard && Array.isArray(comp.keyQuestionsHard)) {
-          comp.keyQuestionsHard.forEach((q) => {
-            allDomainQuestions.push({ ...q, companyStyle: cName });
-          });
-        }
-      });
-    }
-    (domainConfig.mediumQuestions || []).forEach((q) => allDomainQuestions.push(q));
-    (domainConfig.easyQuestions || []).forEach((q) => allDomainQuestions.push(q));
-  } else if (difficulty === "Medium") {
-    (domainConfig.mediumQuestions || []).forEach((q) => allDomainQuestions.push(q));
-    (domainConfig.easyQuestions || []).forEach((q) => allDomainQuestions.push(q));
-  } else {
-    (domainConfig.easyQuestions || []).forEach((q) => allDomainQuestions.push(q));
-    (domainConfig.mediumQuestions || []).forEach((q) => allDomainQuestions.push(q));
-  }
-
-  const usedTexts = new Set(previousQuestions.map((q) => q.questionText.toLowerCase().trim()));
-  const available = allDomainQuestions.filter(
-    (q) => !usedTexts.has(q.questionText.toLowerCase().trim())
-  );
-
-  if (available.length > 0) {
-    const chosen = available[Math.floor(Math.random() * available.length)];
-    return {
-      topic: chosen.topic,
-      subtopic: chosen.subtopic || "Domain Practice",
-      questionType: chosen.questionType || "Technical",
-      difficulty: chosen.difficulty || difficulty,
-      questionText: cleanDisallowedChars(chosen.questionText),
-      expectedKeyPoints: (chosen.expectedKeyPoints || []).map(cleanDisallowedChars),
-      isFollowUp: false,
-      source: "curated-knowledge-base",
-    };
-  }
-
-  const domainSkills = domainConfig.skillCategories || ["System Architecture", "API Design", "Data Modeling"];
-  const topicChosen = domainSkills[questionIndex % domainSkills.length];
-  const seedId = Math.floor(1000 + Math.random() * 9000);
-
-  return {
-    topic: topicChosen,
-    subtopic: "High Availability & Scalability",
-    questionType: "System Design",
+  // Fallback to curated final evaluation
+  return generateCuratedFinalEvaluation({
+    role,
+    domain,
     difficulty,
-    questionText: `In the context of ${topicChosen} (Scenario ID ${seedId}) within ${domain}, how would you architect a fault-tolerant solution that gracefully handles sudden network partitions and regional database failovers without data loss?`,
-    expectedKeyPoints: ["Fault isolation patterns", "Data reconciliation strategies", "Observability metrics"],
-    isFollowUp: false,
-    source: "curated-knowledge-base",
-  };
+    companyStyle,
+    questions: validQuestions.length > 0 ? validQuestions : questions,
+    overallPercentage,
+    calculatedHireRecommendation,
+  });
 }
 
 function generateCuratedFinalEvaluation({
@@ -1226,79 +1178,220 @@ function generateCuratedFinalEvaluation({
   calculatedHireRecommendation,
 }) {
   const domainConfig = getDomainConfig(domain);
-  const skills = domainConfig.skillCategories || [
-    "Technical Foundations",
-    "System Architecture",
-    "Trade-off Analysis",
-    "Communication Clarity",
-  ];
+  const strengths = [];
+  const weaknesses = [];
 
-  const skillGaps = skills.map((skill, idx) => {
-    const variation = ((idx * 7 + overallPercentage) % 25) - 10;
-    const skillScore = Math.min(100, Math.max(30, overallPercentage + variation));
-    let status = "Proficient";
-    if (skillScore >= 85) status = "Strong";
-    else if (skillScore < 55) status = "Needs Work";
-
-    return {
-      skillName: skill,
-      category: "Core Competency",
-      score: skillScore,
-      status,
-      gapDescription: skillScore < 70
-        ? `Focus on deepening real-world trade-off analysis and technical precision in ${skill}.`
-        : `Strong baseline demonstrated in ${skill}. Continue refining advanced edge cases.`,
-      recommendedAction: `Complete 3 targeted practice rounds focused on ${skill} with timed constraints.`,
-    };
+  questions.forEach((q) => {
+    if (q.evaluation?.strengths) {
+      q.evaluation.strengths.forEach((s) => strengths.push(s));
+    }
+    if (q.evaluation?.improvements) {
+      q.evaluation.improvements.forEach((w) => weaknesses.push(w));
+    }
   });
+
+  const uniqueStrengths = Array.from(new Set(strengths)).slice(0, 4);
+  const uniqueWeaknesses = Array.from(new Set(weaknesses)).slice(0, 4);
 
   return {
     overallScore: overallPercentage,
     hireRecommendation: calculatedHireRecommendation,
-    summaryText: `Candidate completed a ${difficulty} level interview for ${role} under the ${companyStyle} evaluation framework. Demonstrated solid problem decomposition with opportunities for enhanced depth in operational edge cases.`,
-    keyStrengths: [
-      "Clear articulation of core concepts and design decisions.",
-      "Structured communication when breaking down complex requirements.",
-      "Good understanding of fundamental domain workflows.",
-    ],
-    priorityImprovementAreas: [
-      "Quantify trade-offs with explicit memory, latency, and throughput metrics.",
-      "Explore failure recovery and graceful degradation patterns more deeply.",
-      "Refine technical terminology precision under interview time constraints.",
-    ],
-    skillGapAnalysis: skillGaps,
-    personalizedPreparationPlan: [
+    summaryText: `Candidate completed mock interview for ${role} in ${domain}. Technical reasoning evaluated with an overall score of ${overallPercentage}/100.`,
+    keyStrengths: uniqueStrengths.length > 0 ? uniqueStrengths : ["Demonstrated technical problem-solving initiative."],
+    priorityImprovementAreas: uniqueWeaknesses.length > 0 ? uniqueWeaknesses : ["Deepen edge-case mitigation and operational latency trade-offs."],
+    skillGapAnalysis: (domainConfig.skillCategories || ["System Design", "Coding", "Problem Solving"]).map((skill) => ({
+      skillName: skill,
+      category: "Technical",
+      score: overallPercentage,
+      status: overallPercentage >= 70 ? "Proficient" : "Developing",
+      gapDescription: overallPercentage >= 70 ? "Meets domain expectations." : "Review core patterns and performance trade-offs.",
+    })),
+    learningRoadmap: [
       {
-        step: 1,
-        title: "Deepen Edge-Case & Scale Analysis",
-        action: `Review standard distributed failure patterns in ${domain} (rate limiting, circuit breaking, idempotency).`,
+        phase: "Phase 1: Foundations",
+        title: `${domain} Core Principles`,
+        action: "Review data modeling, latency benchmarks, and concurrency primitives.",
       },
       {
-        step: 2,
-        title: "Targeted Timed Mock Sessions",
-        action: "Practice 5-minute timed response structuring using the STAR framework and clear architectural diagrams.",
-      },
-      {
-        step: 3,
-        title: "Company Style Alignment",
-        action: `Align practice answers with ${companyStyle}'s core evaluation criteria and behavioral leadership principles.`,
+        phase: "Phase 2: Scale & Reliability",
+        title: "High-Throughput Systems",
+        action: "Practice distributed partitioning, rate limiting, and failure domain isolation.",
       },
     ],
   };
 }
 
-function cleanDisallowedChars(str) {
-  if (typeof str !== "string") return str;
-  return str
-    .replace(/[\u2014\u2015]/g, " - ")
-    .replace(/[\u2013]/g, "-")
-    .replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, "")
-    .replace(/[\u2600-\u27BF]/g, "");
+function getCuratedInitialQuestion({
+  domain,
+  difficulty = "Hard",
+  companyStyle = "General Tech",
+  previouslyAskedTexts = [],
+  interviewType = "Mixed",
+  programmingLanguage = "javascript",
+}) {
+  const domainConfig = getDomainConfig(domain);
+  const eligibleQuestions = [];
+  const usedTexts = new Set((previouslyAskedTexts || []).map((t) => t.toLowerCase().trim()));
+
+  if (interviewType.includes("HR") || interviewType.includes("Behavioral")) {
+    const freshHr = HR_BEHAVIORAL_QUESTIONS.filter((q) => !usedTexts.has(q.questionText.toLowerCase().trim()));
+    const chosen = freshHr.length > 0 ? freshHr[0] : HR_BEHAVIORAL_QUESTIONS[0];
+    return {
+      topic: chosen.topic,
+      subtopic: chosen.subtopic,
+      questionType: "Behavioral",
+      difficulty: chosen.difficulty || difficulty,
+      questionText: cleanDisallowedChars(chosen.questionText),
+      expectedKeyPoints: (chosen.expectedKeyPoints || []).map(cleanDisallowedChars),
+      source: "curated-hr-bank",
+    };
+  }
+
+  if (interviewType.includes("System Design")) {
+    const domainScenarios = SYSTEM_DESIGN_SCENARIOS[domain] || SYSTEM_DESIGN_SCENARIOS["Software Engineering"] || [];
+    const freshSd = domainScenarios.filter((q) => !usedTexts.has(q.questionText.toLowerCase().trim()));
+    const chosen = freshSd.length > 0 ? freshSd[0] : (domainScenarios[0] || SYSTEM_DESIGN_SCENARIOS["Software Engineering"][0]);
+    return {
+      topic: chosen.topic,
+      subtopic: chosen.subtopic,
+      questionType: "System Design",
+      difficulty: chosen.difficulty || difficulty,
+      questionText: cleanDisallowedChars(chosen.questionText),
+      expectedKeyPoints: (chosen.expectedKeyPoints || []).map(cleanDisallowedChars),
+      source: "curated-system-design-bank",
+    };
+  }
+
+  if (difficulty === "Hard" && domainConfig.hardQuestions) {
+    domainConfig.hardQuestions.forEach((q) => eligibleQuestions.push(q));
+  } else if (difficulty === "Medium" && domainConfig.mediumQuestions) {
+    domainConfig.mediumQuestions.forEach((q) => eligibleQuestions.push(q));
+  } else if (domainConfig.easyQuestions) {
+    domainConfig.easyQuestions.forEach((q) => eligibleQuestions.push(q));
+  }
+
+  const freshQuestions = eligibleQuestions.filter((q) => !usedTexts.has(q.questionText.toLowerCase().trim()));
+  const chosen = freshQuestions.length > 0 ? freshQuestions[0] : (eligibleQuestions[0] || {
+    topic: "System Design",
+    questionText: `Explain how you would design a scalable, fault-tolerant rate limiting service for high-traffic APIs.`,
+    expectedKeyPoints: ["Token bucket or sliding window algorithm", "Distributed Redis cluster", "Handling network partitions"],
+  });
+
+  return {
+    topic: chosen.topic || "Technical Reasoning",
+    subtopic: chosen.subtopic || "Core Principles",
+    questionType: chosen.questionType || "Technical",
+    difficulty,
+    questionText: cleanDisallowedChars(chosen.questionText),
+    expectedKeyPoints: (chosen.expectedKeyPoints || []).map(cleanDisallowedChars),
+    source: "curated-knowledge-base",
+  };
+}
+
+function getNextCuratedOrGeneratedQuestion({
+  domain,
+  difficulty = "Hard",
+  interviewType = "Technical",
+  questionIndex = 1,
+  totalPlanned = 5,
+  previousQuestions = [],
+  isFollowUp = false,
+  parentTopic = "",
+}) {
+  const domainConfig = getDomainConfig(domain);
+  const usedTexts = new Set(previousQuestions.map((q) => q.questionText.toLowerCase().trim()));
+
+  if (isFollowUp) {
+    if (interviewType.includes("HR") || interviewType.includes("Behavioral")) {
+      return {
+        topic: parentTopic || "Behavioral Deep Dive",
+        subtopic: "Reflective Follow-Up",
+        questionType: "Behavioral",
+        difficulty,
+        questionText: `Looking back on that situation: If you encountered the exact same dilemma today with greater experience, what would you do differently?`,
+        expectedKeyPoints: ["Continuous personal growth", "Refined communication approach", "Systemic conflict mitigation"],
+        isFollowUp: true,
+        source: "adaptive-followup",
+      };
+    }
+
+    return {
+      topic: parentTopic || "Deep Dive",
+      subtopic: "Adaptive Follow-Up",
+      questionType: "Technical",
+      difficulty,
+      questionText: `Following up on your previous answer: What are the primary failure modes of this approach, and how would you mitigate them under 10x traffic?`,
+      expectedKeyPoints: ["Graceful degradation", "Backpressure and queuing", "Observability metrics"],
+      isFollowUp: true,
+      source: "adaptive-followup",
+    };
+  }
+
+  if (interviewType.includes("HR") || interviewType.includes("Behavioral")) {
+    const freshHr = HR_BEHAVIORAL_QUESTIONS.filter((q) => !usedTexts.has(q.questionText.toLowerCase().trim()));
+    const chosen = freshHr.length > 0 ? freshHr[0] : HR_BEHAVIORAL_QUESTIONS[0];
+    return {
+      topic: chosen.topic,
+      subtopic: chosen.subtopic,
+      questionType: "Behavioral",
+      difficulty: chosen.difficulty || difficulty,
+      questionText: cleanDisallowedChars(chosen.questionText),
+      expectedKeyPoints: (chosen.expectedKeyPoints || []).map(cleanDisallowedChars),
+      isFollowUp: false,
+      source: "curated-hr-bank",
+    };
+  }
+
+  if (interviewType.includes("System Design")) {
+    const domainScenarios = SYSTEM_DESIGN_SCENARIOS[domain] || SYSTEM_DESIGN_SCENARIOS["Software Engineering"] || [];
+    const freshSd = domainScenarios.filter((q) => !usedTexts.has(q.questionText.toLowerCase().trim()));
+    const chosen = freshSd.length > 0 ? freshSd[0] : (domainScenarios[0] || SYSTEM_DESIGN_SCENARIOS["Software Engineering"][0]);
+    return {
+      topic: chosen.topic,
+      subtopic: chosen.subtopic,
+      questionType: "System Design",
+      difficulty: chosen.difficulty || difficulty,
+      questionText: cleanDisallowedChars(chosen.questionText),
+      expectedKeyPoints: (chosen.expectedKeyPoints || []).map(cleanDisallowedChars),
+      isFollowUp: false,
+      source: "curated-system-design-bank",
+    };
+  }
+
+  const eligible = [];
+  if (difficulty === "Hard" && domainConfig.hardQuestions) {
+    domainConfig.hardQuestions.forEach((q) => eligible.push(q));
+  } else if (domainConfig.mediumQuestions) {
+    domainConfig.mediumQuestions.forEach((q) => eligible.push(q));
+  } else if (domainConfig.easyQuestions) {
+    domainConfig.easyQuestions.forEach((q) => eligible.push(q));
+  }
+
+  const fresh = eligible.filter((q) => !usedTexts.has(q.questionText.toLowerCase().trim()));
+  const chosen = fresh.length > 0 ? fresh[0] : {
+    topic: "Architecture & Scale",
+    subtopic: "Distributed Systems",
+    questionType: "Technical",
+    difficulty,
+    questionText: `How would you guarantee data consistency across distributed database shards during a network partition?`,
+    expectedKeyPoints: ["Two-phase commit or Sagas", "CRDTs or quorum replication", "Conflict resolution"],
+    source: "curated-knowledge-base",
+  };
+
+  return {
+    topic: chosen.topic || "Core Concepts",
+    subtopic: chosen.subtopic || "Practice",
+    questionType: chosen.questionType || "Technical",
+    difficulty,
+    questionText: cleanDisallowedChars(chosen.questionText),
+    expectedKeyPoints: (chosen.expectedKeyPoints || []).map(cleanDisallowedChars),
+    isFollowUp: false,
+    source: "curated-knowledge-base",
+  };
 }
 
 module.exports = {
   generateInitialQuestion,
   evaluateAnswerAndGenerateNext,
   generateFinalEvaluation,
-  cleanDisallowedChars,
 };

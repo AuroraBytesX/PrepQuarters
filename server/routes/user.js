@@ -2,15 +2,14 @@ const express = require("express");
 const router = express.Router();
 
 const protect = require("../middleware/authMiddleware");
-const User = require("../models/User");
-const InterviewSession = require("../models/InterviewSession");
+const { findUserById, updateUser } = require("../services/AppwriteService");
 
 /* =========================================
    GET CURRENT USER PROFILE
 ========================================= */
 router.get("/me", protect, async (req, res) => {
   try {
-    const user = await User.findById(req.user.userId).select("-password");
+    const user = await findUserById(req.user.userId);
 
     if (!user) {
       return res.status(404).json({
@@ -19,9 +18,11 @@ router.get("/me", protect, async (req, res) => {
       });
     }
 
+    const { password, ...safeUser } = user;
+
     res.json({
       success: true,
-      user,
+      user: safeUser,
     });
   } catch (error) {
     console.error("Error retrieving user profile:", error.message);
@@ -39,22 +40,25 @@ router.put("/preferences", protect, async (req, res) => {
   try {
     const { targetRole, targetDomain, targetDifficulty } = req.body;
 
-    const updatedUser = await User.findByIdAndUpdate(
-      req.user.userId,
-      {
-        $set: {
-          ...(targetRole && { targetRole }),
-          ...(targetDomain && { targetDomain }),
-          ...(targetDifficulty && { targetDifficulty }),
-        },
-      },
-      { new: true }
-    ).select("-password");
+    const updatedUser = await updateUser(req.user.userId, {
+      ...(targetRole && { targetRole }),
+      ...(targetDomain && { targetDomain }),
+      ...(targetDifficulty && { targetDifficulty }),
+    });
+
+    if (!updatedUser) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found.",
+      });
+    }
+
+    const { password, ...safeUser } = updatedUser;
 
     res.json({
       success: true,
       message: "Preferences updated successfully.",
-      user: updatedUser,
+      user: safeUser,
     });
   } catch (error) {
     console.error("Error updating preferences:", error.message);

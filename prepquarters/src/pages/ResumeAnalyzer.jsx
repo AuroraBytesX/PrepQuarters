@@ -12,22 +12,18 @@ import {
   Copy,
   Check,
   RefreshCw,
-  ShieldCheck,
-  Zap,
   Target,
   Layers,
-  Briefcase,
-  Sliders,
-  TrendingUp,
-  Cpu,
-  Bot,
   Send,
   Code,
   Edit3,
   ListOrdered,
-  AlertOctagon,
-  Info,
+  PlusCircle,
+  MinusCircle,
+  HelpCircle,
+  Zap,
 } from "lucide-react";
+import { API_BASE_URL } from "../config/api";
 import "./ResumeAnalyzer.css";
 
 function ResumeAnalyzer() {
@@ -37,7 +33,7 @@ function ResumeAnalyzer() {
   const [workspaceTab, setWorkspaceTab] = useState("analyzer");
 
   /* =========================================================
-     1. ATS ANALYZER STATE
+     1. RESUME IMPROVEMENT & TAILORING STATE
   ========================================================= */
   const [inputMode, setInputMode] = useState("paste"); // "paste" | "upload"
   const [resumeText, setResumeText] = useState("");
@@ -48,7 +44,8 @@ function ResumeAnalyzer() {
   const [analyzing, setAnalyzing] = useState(false);
   const [error, setError] = useState("");
   const [report, setReport] = useState(null);
-  const [copiedSection, setCopiedSection] = useState(null);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [isDragging, setIsDragging] = useState(false);
 
   /* =========================================================
      2. AI RESUME BUILDER & LATEX STUDIO STATE
@@ -57,86 +54,70 @@ function ResumeAnalyzer() {
   const [chatMessages, setChatMessages] = useState([
     {
       sender: "ai",
-      text: "Hello! I am your AI Resume Architect. Let's create an ATS-friendly, compile-ready LaTeX resume. To begin, what is your target role (e.g. Senior Backend Engineer, Full Stack Developer)?",
+      text: "Hello! I am your AI Resume Architect. What is your target role (e.g., Senior Backend Engineer, Full Stack Developer, DevOps Specialist)?",
     },
   ]);
   const [chatInput, setChatInput] = useState("");
   const [isAiThinking, setIsAiThinking] = useState(false);
+  const [confirmationPending, setConfirmationPending] = useState(false);
 
   const [builtResume, setBuiltResume] = useState({
-    name: "John Doe",
-    email: "john.doe@example.com",
-    phone: "+1 (555) 019-2834",
-    location: "San Francisco, CA",
-    linkedin: "linkedin.com/in/johndoe",
-    github: "github.com/johndoe",
-    targetRole: "Senior Software Engineer",
-    summary: "Senior Software Engineer with 5+ years specializing in distributed systems, high-throughput microservices, and cloud infrastructure.",
-    skills: {
-      languages: ["Python", "Go", "TypeScript", "SQL"],
-      frameworks: ["React", "Node.js", "FastAPI", "Docker"],
-      databases: ["PostgreSQL", "Redis", "Kafka"],
-      tools: ["AWS", "Kubernetes", "CI/CD", "Git"],
-    },
-    experience: [
-      {
-        title: "Senior Backend Engineer",
-        company: "Acme Cloud Systems",
-        location: "San Francisco, CA",
-        dateRange: "2022 - Present",
-        bullets: [
-          "Architected distributed Kafka event streaming pipeline handling 150,000 requests per second across 3 cloud regions.",
-          "Optimized PostgreSQL database query execution plans, reducing P99 latency by 45% and saving $40,000 annually.",
-          "Automated container deployment pipelines with Kubernetes, increasing release velocity by 3x.",
-        ],
-      },
-    ],
-    education: [
-      {
-        degree: "B.S. in Computer Science",
-        institution: "University of California, Berkeley",
-        dateRange: "2018 - 2022",
-        details: "Relevant Coursework: Distributed Systems, Operating Systems, Database Internals.",
-      },
-    ],
-    projects: [
-      {
-        name: "Distributed Raft Key-Value Store",
-        tech: "Go, Raft Consensus, gRPC",
-        bullets: [
-          "Engineered sharded key-value store with leader election and log replication.",
-          "Maintained 99.99% availability during simulated network partition stress tests.",
-        ],
-      },
-    ],
+    name: "",
+    email: "",
+    phone: "",
+    location: "",
+    targetRole: "",
+    summary: "",
+    skills: { languages: [], frameworks: [], databases: [], tools: [] },
+    experience: [],
+    education: [],
+    projects: [],
   });
 
   const [latexCode, setLatexCode] = useState("");
   const [generatingLatex, setGeneratingLatex] = useState(false);
 
   // File Upload handler for analyzer
-  const handleFileUpload = (e) => {
-    const file = e.target.files[0];
+  const processSelectedFile = (file) => {
     if (!file) return;
 
+    if (file.size > 5 * 1024 * 1024) {
+      setError("Document exceeds 5MB. Please upload a standard resume document under 5MB.");
+      return;
+    }
+
+    setSelectedFile(file);
     setUploadedFileName(file.name);
     setError("");
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const content = event.target.result;
-      if (typeof content === "string") {
-        setResumeText(content);
-      }
-    };
-    reader.readAsText(file);
+    const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+    if (isPdf) {
+      setResumeText(`[Uploaded Document: ${file.name} (${(file.size / 1024).toFixed(1)} KB) - Ready for ATS parsing]`);
+    } else {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const content = event.target.result;
+        if (typeof content === "string") {
+          setResumeText(content);
+        }
+      };
+      reader.readAsText(file);
+    }
   };
 
-  // Run ATS Analyzer
+  const handleFileUpload = (e) => {
+    if (e.target.files && e.target.files[0]) {
+      processSelectedFile(e.target.files[0]);
+    }
+  };
+
+  // Run Qualitative Resume Analysis
   const handleAnalyze = async (textToUse) => {
     const content = typeof textToUse === "string" ? textToUse : resumeText;
-    if (!content || content.trim().length < 40) {
-      setError("Please paste your resume content or upload a document (minimum 40 characters).");
+    const isUsingFile = Boolean(selectedFile && (!textToUse || inputMode === "upload"));
+
+    if (!isUsingFile && (!content || content.trim().length < 20)) {
+      setError("Please paste your resume content or upload a document (minimum 20 characters).");
       return;
     }
 
@@ -145,15 +126,28 @@ function ResumeAnalyzer() {
     setReport(null);
 
     try {
-      const res = await fetch("https://prepquarters-backend.onrender.com/api/resume/analyze", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          resumeText: content,
-          jobDescription,
-          targetRole,
-        }),
-      });
+      let res;
+      if (isUsingFile) {
+        const formData = new FormData();
+        formData.append("resumeFile", selectedFile);
+        formData.append("jobDescription", jobDescription || "");
+        formData.append("targetRole", targetRole || "Software Engineer");
+
+        res = await fetch(`${API_BASE_URL}/api/resume/analyze`, {
+          method: "POST",
+          body: formData,
+        });
+      } else {
+        res = await fetch(`${API_BASE_URL}/api/resume/analyze`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            resumeText: content,
+            jobDescription: jobDescription || "",
+            targetRole: targetRole || "Software Engineer",
+          }),
+        });
+      }
 
       const data = await res.json();
       if (!res.ok) {
@@ -165,55 +159,58 @@ function ResumeAnalyzer() {
       }
     } catch (err) {
       console.error("Resume analysis error:", err);
-      setError(err.message || "Failed to connect to ATS analysis service.");
+      setReport(null);
+      setError(err.message || "Failed to connect to resume analysis service.");
     } finally {
       setAnalyzing(false);
     }
   };
 
-  // Send Conversational Builder message
-  const handleSendBuilderChat = async () => {
-    if (!chatInput.trim() || isAiThinking) return;
+  // Conversational Resume Builder message submission
+  const handleSendMessage = async (customMsg = null, confirmGenerate = false) => {
+    const text = typeof customMsg === "string" ? customMsg : chatInput;
+    if (!text.trim() && !confirmGenerate) return;
 
-    const userText = chatInput.trim();
-    setChatMessages((prev) => [...prev, { sender: "user", text: userText }]);
-    setChatInput("");
+    if (!confirmGenerate) {
+      setChatMessages((prev) => [...prev, { sender: "user", text: text.trim() }]);
+      setChatInput("");
+    }
     setIsAiThinking(true);
 
     try {
-      const res = await fetch("https://prepquarters-backend.onrender.com/api/resume/build/chat-assist", {
+      const res = await fetch(`${API_BASE_URL}/api/resume/builder/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          userMessage: userText,
           currentResume: builtResume,
+          message: confirmGenerate ? "generate final resume" : text.trim(),
           step: builderStep,
+          userConfirmed: confirmGenerate,
         }),
       });
 
       const data = await res.json();
       if (data.success) {
         setChatMessages((prev) => [...prev, { sender: "ai", text: data.aiResponse }]);
-        setBuilderStep(data.nextStep);
-        if (data.updatedResume) {
-          setBuiltResume(data.updatedResume);
-        }
+        if (data.updatedResume) setBuiltResume(data.updatedResume);
+        if (data.nextStep) setBuilderStep(data.nextStep);
+        if (typeof data.confirmationPending === "boolean") setConfirmationPending(data.confirmationPending);
+        if (data.latex) setLatexCode(data.latex);
       }
-    } catch (err) {
+    } catch (e) {
       setChatMessages((prev) => [
         ...prev,
-        { sender: "ai", text: "Got it. Let's proceed to the next section or review the preview on the right." },
+        { sender: "ai", text: "I encountered an issue updating your resume state. Please try again." },
       ]);
     } finally {
       setIsAiThinking(false);
     }
   };
 
-  // Generate Compile-Ready LaTeX
-  const handleGenerateLatex = async () => {
+  const handleCompileLatex = async () => {
     setGeneratingLatex(true);
     try {
-      const res = await fetch("https://prepquarters-backend.onrender.com/api/resume/build/generate-latex", {
+      const res = await fetch(`${API_BASE_URL}/api/resume/generate-latex`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ resumeData: builtResume }),
@@ -223,7 +220,7 @@ function ResumeAnalyzer() {
         setLatexCode(data.latex);
       }
     } catch (e) {
-      console.error("LaTeX generation error:", e);
+      console.error("LaTeX compilation error:", e);
     } finally {
       setGeneratingLatex(false);
     }
@@ -231,9 +228,8 @@ function ResumeAnalyzer() {
 
   // Download LaTeX .tex file
   const downloadLatexFile = () => {
-    const content = latexCode || generateLocalLatexFallback(builtResume);
     const filename = `${(builtResume.name || "Resume").replace(/\s+/g, "_")}_ATS.tex`;
-    const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+    const blob = new Blob([latexCode], { type: "text/plain;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -242,202 +238,87 @@ function ResumeAnalyzer() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-  };
-
-  // Send Built Resume to ATS Analyzer (Iterative Loop)
-  const handleSendToAtsAudit = () => {
-    const compiledText = `
-${builtResume.name}
-${builtResume.email} | ${builtResume.phone} | ${builtResume.location}
-
-PROFESSIONAL SUMMARY:
-${builtResume.summary}
-
-TECHNICAL SKILLS:
-Languages: ${builtResume.skills.languages?.join(", ")}
-Frameworks: ${builtResume.skills.frameworks?.join(", ")}
-Databases: ${builtResume.skills.databases?.join(", ")}
-Tools: ${builtResume.skills.tools?.join(", ")}
-
-WORK EXPERIENCE:
-${builtResume.experience?.map((e) => `${e.title} at ${e.company} (${e.dateRange})\n${e.bullets?.map((b) => `* ${b}`).join("\n")}`).join("\n\n")}
-
-EDUCATION:
-${builtResume.education?.map((ed) => `${ed.degree} - ${ed.institution} (${ed.dateRange})\n${ed.details || ""}`).join("\n")}
-
-PROJECTS:
-${builtResume.projects?.map((p) => `${p.name} (${p.tech})\n${p.bullets?.map((b) => `* ${b}`).join("\n")}`).join("\n")}
-    `.trim();
-
-    setResumeText(compiledText);
-    setWorkspaceTab("analyzer");
-    handleAnalyze(compiledText);
-  };
-
-  const generateLocalLatexFallback = (data) => {
-    return `% PrepQuarters ATS-Optimized Professional Resume
-\\documentclass[10pt,letterpaper]{article}
-\\usepackage[margin=0.65in]{geometry}
-\\usepackage{hyperref}
-\\usepackage{enumitem}
-\\usepackage{titlesec}
-\\begin{document}
-\\begin{center}
-    {\\huge \\textbf{${data.name}}} \\\\[4pt]
-    \\small ${data.phone} $|$ \\href{mailto:${data.email}}{${data.email}} $|$ ${data.location}
-\\end{center}
-\\section*{Professional Summary}
-${data.summary}
-\\end{document}
-    `;
-  };
-
-  // Download ATS Analysis Report
-  const downloadReport = (format = "md") => {
-    if (!report) return;
-
-    let content = "";
-    const filename = `PrepQuarters_ATS_Readiness_Report_${Date.now()}.${format}`;
-
-    if (format === "md") {
-      content = `# PrepQuarters Explainable ATS Readiness Report
-Target Role: ${report.targetRole}
-Analyzed At: ${new Date(report.analyzedAt).toLocaleString()}
-
-## 1. Overall ATS Readiness Score: ${report.overallScore}/100
-
-### Category Breakdown:
-- Parsing Compatibility: ${report.categoryScores?.parsingCompatibility?.score}/100 -> ${report.categoryScores?.parsingCompatibility?.explanation}
-- Document Structure: ${report.categoryScores?.documentStructure?.score}/100 -> ${report.categoryScores?.documentStructure?.explanation}
-- Keyword Coverage: ${report.categoryScores?.keywordRelevance?.score}/100 -> ${report.categoryScores?.keywordRelevance?.explanation}
-- Job Description Alignment: ${report.categoryScores?.jdAlignment?.score ? `${report.categoryScores.jdAlignment.score}/100` : "Not provided"} -> ${report.categoryScores?.jdAlignment?.explanation}
-- Skills Relevance: ${report.categoryScores?.skillsRelevance?.score}/100 -> ${report.categoryScores?.skillsRelevance?.explanation}
-- Experience Quality: ${report.categoryScores?.experienceQuality?.score}/100 -> ${report.categoryScores?.experienceQuality?.explanation}
-- Content Quality: ${report.categoryScores?.contentQuality?.score}/100 -> ${report.categoryScores?.contentQuality?.explanation}
-
-## 2. Prioritized Improvement Target ("What is preventing this resume from being stronger?")
-${report.prioritizedImprovements?.map((p, i) => `### [${p.priority}] ${p.issue}
-- Why It Matters: ${p.whyItMatters}
-- Suggested Action: ${p.suggestedImprovement}
-${p.exampleWording ? `- Example Wording: "${p.exampleWording}"` : ""}`).join("\n\n")}
-
-## 3. Keywords & Competency Analysis
-- Matched Keywords: ${report.foundKeywords?.join(", ") || "None"}
-- Missing Target Keywords: ${report.missingKeywords?.join(", ") || "None"}
-
----
-*Disclaimer: ${report.disclaimer}*
-`;
-    } else {
-      content = `PREPQUARTERS ATS READINESS REPORT
-==================================
-Overall Score: ${report.overallScore}/100
-Target Role: ${report.targetRole}
-
-IMPROVEMENT PRIORITIES:
-${report.prioritizedImprovements?.map((p) => `[${p.priority}] ${p.issue}\n-> Action: ${p.suggestedImprovement}\n`).join("\n")}
-`;
-    }
-
-    const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
-
-  const copyText = (text, key) => {
-    navigator.clipboard.writeText(text);
-    setCopiedSection(key);
-    setTimeout(() => setCopiedSection(null), 2000);
   };
 
   return (
-    <main className="resume-analyzer-page bg-grid-cyber">
+    <main className="resume-analyzer-page">
       <div className="resume-container">
-        {/* Navigation & Header */}
+        {/* Navigation Bar */}
         <div className="resume-nav-row">
-          <button type="button" className="resume-back-btn" onClick={() => navigate("/")}>
-            <ArrowLeft size={16} aria-hidden="true" />
-            <span>Back to Home</span>
+          <button type="button" className="resume-back-btn" onClick={() => navigate("/dashboard")}>
+            <ArrowLeft size={16} />
+            <span>Back to Dashboard</span>
           </button>
           <div className="resume-badge-pill">
-            <span className="pulse-dot cyan" />
-            <span>ATS INTELLIGENCE // RESUME SUITE</span>
+            <span>RESUME INTELLIGENCE & TAILORING</span>
           </div>
         </div>
 
-        {/* Hero Header */}
+        {/* Header */}
         <header className="resume-header">
           <div className="resume-eyebrow">
-            <Sparkles size={14} aria-hidden="true" />
-            <span>EXPLAINABLE ATS READINESS & LATEX BUILDER</span>
+            <Sparkles size={14} />
+            <span>PRACTICAL RESUME FEEDBACK</span>
           </div>
-          <h1>Industry-Standard ATS Resume Intelligence</h1>
+          <h1>Resume Improvement & Tailoring</h1>
           <p className="resume-subtitle">
-            Scan your resume against standards-based ATS heuristics, analyze keyword coverage,
-            receive prioritized improvement targets, or build compile-ready LaTeX resumes in a guided AI studio.
+            Get actionable suggestions on missing impact metrics, technical keywords, and job-description alignment without arbitrary numerical scores.
           </p>
         </header>
 
-        {/* Primary Workspace Mode Selector */}
-        <div className="workspace-tabs-row">
+        {/* Primary Workspace Mode Switcher */}
+        <div className="resume-workspace-switcher">
           <button
             type="button"
             className={`workspace-tab-btn ${workspaceTab === "analyzer" ? "active" : ""}`}
             onClick={() => setWorkspaceTab("analyzer")}
           >
-            <FileText size={16} />
-            <span>ATS Resume Analyzer & Scanner</span>
+            <Target size={16} />
+            <span>Resume Improvement & Suggestions</span>
           </button>
           <button
             type="button"
             className={`workspace-tab-btn ${workspaceTab === "builder" ? "active" : ""}`}
-            onClick={() => {
-              setWorkspaceTab("builder");
-              if (!latexCode) handleGenerateLatex();
-            }}
+            onClick={() => setWorkspaceTab("builder")}
           >
-            <Bot size={16} />
-            <span>AI Resume Builder & LaTeX Studio</span>
+            <Code size={16} />
+            <span>Interactive LaTeX Builder</span>
           </button>
         </div>
 
+        {/* Error Notification */}
         {error && (
-          <div className="resume-error-banner" role="alert">
-            <AlertTriangle size={18} aria-hidden="true" />
+          <div className="resume-error-banner">
+            <AlertTriangle size={18} />
             <span>{error}</span>
           </div>
         )}
 
         {/* =========================================================
-            WORKSPACE TAB 1: ATS RESUME ANALYZER
+            TAB 1: RESUME IMPROVEMENT & SUGGESTIONS
         ========================================================= */}
         {workspaceTab === "analyzer" && (
-          <div>
+          <div className="resume-analyzer-layout">
             <div className="resume-input-grid">
-              {/* Left: Resume Input */}
+              {/* Left: Input Mode & Content */}
               <section className="resume-card">
                 <div className="resume-card-header">
                   <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                    <FileText size={20} style={{ color: "var(--cyan-bright)" }} />
-                    <h3>Resume Content</h3>
+                    <FileText size={20} style={{ color: "#10b981" }} />
+                    <h3>Resume Document</h3>
                   </div>
-                  <div className="resume-toggle-pills">
+
+                  <div className="resume-mode-pills">
                     <button
                       type="button"
-                      className={`resume-toggle-btn ${inputMode === "paste" ? "active" : ""}`}
+                      className={`mode-pill ${inputMode === "paste" ? "active" : ""}`}
                       onClick={() => setInputMode("paste")}
                     >
-                      Paste Text / LaTeX
+                      Paste Text
                     </button>
                     <button
                       type="button"
-                      className={`resume-toggle-btn ${inputMode === "upload" ? "active" : ""}`}
+                      className={`mode-pill ${inputMode === "upload" ? "active" : ""}`}
                       onClick={() => setInputMode("upload")}
                     >
                       Upload File
@@ -450,34 +331,146 @@ ${report.prioritizedImprovements?.map((p) => `[${p.priority}] ${p.issue}\n-> Act
                     <textarea
                       className="resume-textarea"
                       rows={14}
-                      placeholder="Paste your plain text, Markdown, or LaTeX resume content here...&#10;&#10;Example:&#10;John Doe - Senior Backend Engineer&#10;Technical Skills: Python, Go, Distributed Systems, PostgreSQL, AWS, Docker&#10;Experience: Senior Engineer at Acme Corp (2022-Present)..."
+                      placeholder="Paste your plain text, Markdown, or LaTeX resume content here...&#10;&#10;Example:&#10;Technical Skills: Python, Go, Distributed Systems, PostgreSQL, AWS, Docker&#10;Experience: Architected distributed event streaming pipeline handling 150k req/sec..."
                       value={resumeText}
-                      onChange={(e) => setResumeText(e.target.value)}
+                      onChange={(e) => {
+                        setResumeText(e.target.value);
+                        setSelectedFile(null);
+                        setUploadedFileName("");
+                      }}
                     />
                     <div className="resume-char-count">
                       <span>{resumeText.length} characters</span>
                     </div>
                   </div>
                 ) : (
-                  <div className="resume-upload-zone">
+                  <div
+                    className={`resume-upload-zone ${isDragging ? "dragging-active" : ""}`}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      setIsDragging(true);
+                    }}
+                    onDragEnter={(e) => {
+                      e.preventDefault();
+                      setIsDragging(true);
+                    }}
+                    onDragLeave={(e) => {
+                      e.preventDefault();
+                      setIsDragging(false);
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      setIsDragging(false);
+                      if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                        processSelectedFile(e.dataTransfer.files[0]);
+                      }
+                    }}
+                    style={{
+                      border: isDragging ? "2px dashed #10b981" : "2px dashed rgba(255, 255, 255, 0.15)",
+                      background: isDragging ? "rgba(16, 185, 129, 0.08)" : "rgba(0, 0, 0, 0.2)",
+                      borderRadius: "14px",
+                      padding: "28px 20px",
+                      textAlign: "center",
+                      transition: "all 0.2s ease",
+                    }}
+                  >
                     <input
                       type="file"
                       id="resume-file-input"
-                      accept=".txt,.md,.tex,.doc,.docx,.pdf"
+                      accept=".pdf,.docx,.doc,.txt,.md,.tex"
                       onChange={handleFileUpload}
                       style={{ display: "none" }}
                     />
-                    <label htmlFor="resume-file-input" className="resume-dropzone-label">
-                      <UploadCloud size={40} style={{ color: "var(--cyan-bright)", marginBottom: "10px" }} />
-                      <strong>Choose a document or drag & drop</strong>
-                      <p>Supports .txt, .md, .tex, .docx, .pdf text documents</p>
-                      {uploadedFileName && (
-                        <div className="uploaded-file-tag">
-                          <Check size={14} />
-                          <span>{uploadedFileName}</span>
+
+                    {selectedFile ? (
+                      <div
+                        style={{
+                          background: "rgba(16, 185, 129, 0.06)",
+                          border: "1px solid rgba(16, 185, 129, 0.3)",
+                          borderRadius: "12px",
+                          padding: "20px",
+                          display: "flex",
+                          flexDirection: "column",
+                          alignItems: "center",
+                          gap: "10px",
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: "48px",
+                            height: "48px",
+                            borderRadius: "10px",
+                            background: "rgba(16, 185, 129, 0.15)",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            color: "#10b981",
+                          }}
+                        >
+                          <FileText size={26} />
                         </div>
-                      )}
-                    </label>
+
+                        <div>
+                          <strong style={{ display: "block", color: "#f8fafc", fontSize: "1rem", wordBreak: "break-all" }}>
+                            {selectedFile.name}
+                          </strong>
+                          <span style={{ fontSize: "0.85rem", color: "#94a3b8" }}>
+                            {(selectedFile.size / 1024).toFixed(1)} KB &bull; Document Verified (Max 5MB)
+                          </span>
+                        </div>
+
+                        <div style={{ display: "flex", alignItems: "center", gap: "6px", color: "#34d399", fontSize: "0.85rem", fontWeight: 600 }}>
+                          <CheckCircle2 size={16} />
+                          <span>Ready for Text Extraction</span>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedFile(null);
+                            setUploadedFileName("");
+                            setResumeText("");
+                          }}
+                          style={{
+                            marginTop: "8px",
+                            padding: "6px 14px",
+                            borderRadius: "6px",
+                            background: "rgba(239, 68, 68, 0.1)",
+                            border: "1px solid rgba(239, 68, 68, 0.25)",
+                            color: "#f87171",
+                            fontSize: "0.82rem",
+                            fontWeight: 600,
+                            cursor: "pointer",
+                          }}
+                        >
+                          Remove / Choose Another File
+                        </button>
+                      </div>
+                    ) : (
+                      <label htmlFor="resume-file-input" style={{ cursor: "pointer", display: "block" }}>
+                        <UploadCloud size={44} style={{ color: "#10b981", margin: "0 auto 12px" }} />
+                        <strong style={{ display: "block", fontSize: "1.05rem", color: "#f8fafc", marginBottom: "6px" }}>
+                          Choose a PDF document or drag & drop
+                        </strong>
+                        <p style={{ fontSize: "0.88rem", color: "#94a3b8", margin: "0 0 14px" }}>
+                          Supports PDF, DOCX, LaTeX, Markdown, or TXT (Max 5MB)
+                        </p>
+                        <span
+                          style={{
+                            display: "inline-block",
+                            padding: "8px 18px",
+                            borderRadius: "8px",
+                            background: "rgba(16, 185, 129, 0.12)",
+                            border: "1px solid rgba(16, 185, 129, 0.35)",
+                            color: "#34d399",
+                            fontSize: "0.88rem",
+                            fontWeight: 600,
+                          }}
+                        >
+                          Browse File
+                        </span>
+                      </label>
+                    )}
                   </div>
                 )}
               </section>
@@ -489,7 +482,7 @@ ${report.prioritizedImprovements?.map((p) => `[${p.priority}] ${p.issue}\n-> Act
                     <Target size={20} style={{ color: "#34d399" }} />
                     <h3>Target Job Description (Optional)</h3>
                   </div>
-                  <span className="resume-optional-tag">RECOMMENDED FOR JD MATCH</span>
+                  <span className="resume-optional-tag">RECOMMENDED FOR TAILORING</span>
                 </div>
 
                 <div style={{ marginBottom: "16px" }}>
@@ -515,7 +508,7 @@ ${report.prioritizedImprovements?.map((p) => `[${p.priority}] ${p.issue}\n-> Act
                   <textarea
                     className="resume-textarea"
                     rows={9}
-                    placeholder="Paste the target job description to analyze keyword overlap, missing skills, and candidate qualification alignment..."
+                    placeholder="Paste the target job description to analyze missing keywords, tech stack alignment, and tailoring suggestions..."
                     value={jobDescription}
                     onChange={(e) => setJobDescription(e.target.value)}
                   />
@@ -524,18 +517,18 @@ ${report.prioritizedImprovements?.map((p) => `[${p.priority}] ${p.issue}\n-> Act
                 <button
                   type="button"
                   className="resume-analyze-btn"
-                  disabled={analyzing || !resumeText.trim()}
+                  disabled={analyzing || (!selectedFile && !resumeText.trim())}
                   onClick={() => handleAnalyze()}
                 >
                   {analyzing ? (
                     <>
                       <RefreshCw size={18} className="spin-icon" />
-                      <span>Evaluating ATS Readiness Heuristics...</span>
+                      <span>Analyzing Resume & Generating Suggestions...</span>
                     </>
                   ) : (
                     <>
                       <Zap size={18} />
-                      <span>Run Explainable ATS Audit</span>
+                      <span>Generate Actionable Suggestions</span>
                     </>
                   )}
                 </button>
@@ -543,168 +536,116 @@ ${report.prioritizedImprovements?.map((p) => `[${p.priority}] ${p.issue}\n-> Act
             </div>
 
             {/* =========================================================
-                EXPLAINABLE ATS READINESS REPORT DASHBOARD
+                ACTIONABLE QUALITATIVE SUGGESTIONS (NO ARBITRARY ATS SCORE)
             ========================================================= */}
             {report && (
-              <div className="resume-report-container">
-                {/* Scorecard Header */}
-                <div className="report-header-card">
-                  <div>
-                    <span className="report-badge">AUDIT COMPLETE</span>
-                    <h2>Explainable ATS Readiness Assessment</h2>
-                    <p>Target Role: <strong>{report.targetRole}</strong> // Benchmarked against multi-category applicant tracking heuristics.</p>
-                  </div>
-
-                  <div className="report-download-actions">
-                    <button
-                      type="button"
-                      className="report-action-btn"
-                      onClick={() => downloadReport("md")}
-                    >
-                      <Download size={15} />
-                      <span>Download Markdown Report</span>
-                    </button>
-                    <button
-                      type="button"
-                      className="report-action-btn secondary"
-                      onClick={() => downloadReport("txt")}
-                    >
-                      <Download size={15} />
-                      <span>Download Text Summary</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Overall Score Banner */}
-                <div className="ats-overall-banner">
-                  <div className="overall-score-left">
-                    <span className="overall-label">OVERALL ATS READINESS SCORE</span>
-                    <strong className="overall-val">{report.overallScore}<span>/100</span></strong>
-                  </div>
-                  <p className="overall-explanation">
-                    Weighted calculation of parsing compatibility, structural integrity, keyword coverage, and quantifiable achievement density.
+              <div className="resume-report-container" style={{ marginTop: "36px" }}>
+                <div className="report-header-card" style={{ background: "var(--bg-card)", border: "1px solid var(--border-glass)", borderRadius: "14px", padding: "24px", boxShadow: "var(--shadow-glass)" }}>
+                  <span style={{ fontSize: "0.78rem", fontWeight: 700, color: "var(--accent-primary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                    SUGGESTIONS & TAILORING FEEDBACK
+                  </span>
+                  <h2 style={{ fontSize: "1.5rem", fontWeight: 700, color: "var(--text-primary)", margin: "4px 0 8px" }}>
+                    Resume Diagnostic Suggestions
+                  </h2>
+                  <p style={{ color: "var(--text-secondary)", fontSize: "0.95rem", margin: 0, lineHeight: 1.5 }}>
+                    {report.summaryFeedback}
                   </p>
                 </div>
 
-                {/* Granular Category Scores Grid */}
-                <div className="category-scores-grid">
-                  {Object.entries(report.categoryScores || {}).map(([catKey, catObj]) => (
-                    <div key={catKey} className="category-score-card">
-                      <div className="category-score-top">
-                        <strong className="category-name">
-                          {catKey.replace(/([A-Z])/g, " $1").trim()}
-                        </strong>
-                        <span className={`cat-score-pill ${catObj.score >= 80 ? "high" : catObj.score >= 60 ? "med" : "low"}`}>
-                          {catObj.score !== null ? `${catObj.score}/100` : "N/A"}
-                        </span>
-                      </div>
-                      <p className="cat-score-desc">{catObj.explanation}</p>
+                {/* 1. Improvements to Make */}
+                {report.improvementsToMake?.length > 0 && (
+                  <div style={{ background: "var(--bg-card)", border: "1px solid var(--border-glass)", borderRadius: "14px", padding: "24px", marginTop: "18px", boxShadow: "var(--shadow-glass)" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#f59e0b", marginBottom: "16px" }}>
+                      <AlertTriangle size={20} />
+                      <h3 style={{ fontSize: "1.15rem", fontWeight: 700, color: "var(--text-primary)", margin: 0 }}>
+                        Improve This
+                      </h3>
                     </div>
-                  ))}
-                </div>
-
-                {/* Prioritized Improvement Target: "What is preventing this resume from being stronger?" */}
-                <div className="report-card">
-                  <div className="report-card-header-row">
-                    <h3 style={{ color: "#fbbf24", display: "flex", alignItems: "center", gap: "8px", margin: 0 }}>
-                      <ListOrdered size={20} />
-                      <span>What is preventing this resume from being stronger?</span>
-                    </h3>
-                    <span className="docs-tag">PRIORITIZED TARGETS</span>
-                  </div>
-                  <p style={{ fontSize: "13px", color: "var(--text-secondary)", marginBottom: "18px" }}>
-                    Actionable, evidence-based recommendations categorized by severity.
-                  </p>
-
-                  <div className="priorities-container">
-                    {report.prioritizedImprovements?.map((item, idx) => (
-                      <div key={idx} className={`priority-item-card ${item.priority.toLowerCase()}`}>
-                        <div className="priority-header-row">
-                          <span className={`priority-tag ${item.priority.toLowerCase()}`}>{item.priority}</span>
-                          <strong className="priority-issue">{item.issue}</strong>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                      {report.improvementsToMake.map((imp, idx) => (
+                        <div key={idx} style={{ background: "var(--bg-surface-2)", border: "1px solid var(--border-subtle)", borderRadius: "10px", padding: "16px" }}>
+                          <strong style={{ color: "#d97706", fontSize: "0.9rem", display: "block", marginBottom: "4px" }}>
+                            {imp.category}: {imp.issue}
+                          </strong>
+                          <p style={{ color: "var(--text-secondary)", fontSize: "0.88rem", margin: 0, lineHeight: 1.5 }}>
+                            {imp.recommendation}
+                          </p>
                         </div>
-                        <p className="priority-why">
-                          <strong>Why It Matters:</strong> {item.whyItMatters}
-                        </p>
-                        <p className="priority-action">
-                          <strong>Suggested Improvement:</strong> {item.suggestedImprovement}
-                        </p>
-                        {item.exampleWording && (
-                          <div className="priority-example-box">
-                            <span>Example Wording:</span>
-                            <code>"{item.exampleWording}"</code>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Keywords Cloud */}
-                <div className="report-grid-2col">
-                  <div className="report-card">
-                    <h4 style={{ color: "#34d399", display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px" }}>
-                      <CheckCircle2 size={18} />
-                      <span>Identified Technical Skills ({report.foundKeywords.length})</span>
-                    </h4>
-                    <div className="keywords-tags-cloud">
-                      {report.foundKeywords.map((k) => (
-                        <span key={k} className="keyword-pill matched">
-                          {k}
-                        </span>
                       ))}
                     </div>
                   </div>
+                )}
 
-                  <div className="report-card">
-                    <h4 style={{ color: "#f87171", display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px" }}>
-                      <AlertTriangle size={18} />
-                      <span>Missing & Recommended Keywords ({report.recommendedKeywords.length})</span>
-                    </h4>
-                    <div className="keywords-tags-cloud">
-                      {report.recommendedKeywords.map((k) => (
-                        <span key={k} className="keyword-pill missing">
-                          + {k}
-                        </span>
+                {/* 2. Consider Adding */}
+                {report.recommendedAdditions?.length > 0 && (
+                  <div style={{ background: "var(--bg-card)", border: "1px solid var(--border-glass)", borderRadius: "14px", padding: "24px", marginTop: "18px", boxShadow: "var(--shadow-glass)" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "var(--accent-primary)", marginBottom: "16px" }}>
+                      <PlusCircle size={20} />
+                      <h3 style={{ fontSize: "1.15rem", fontWeight: 700, color: "var(--text-primary)", margin: 0 }}>
+                        Consider Adding
+                      </h3>
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                      {report.recommendedAdditions.map((add, idx) => (
+                        <div key={idx} style={{ background: "var(--accent-soft)", border: "1px solid var(--accent-border)", borderRadius: "10px", padding: "16px" }}>
+                          <strong style={{ color: "var(--accent-primary)", fontSize: "0.9rem", display: "block", marginBottom: "4px" }}>
+                            {add.category}
+                          </strong>
+                          <p style={{ color: "var(--text-secondary)", fontSize: "0.88rem", margin: 0, lineHeight: 1.5 }}>
+                            {add.recommendation}
+                          </p>
+                        </div>
                       ))}
                     </div>
                   </div>
-                </div>
+                )}
 
-                {/* Weak Bullets & STAR Rewrites */}
-                {report.weakBullets && report.weakBullets.length > 0 && (
-                  <div className="report-card">
-                    <div className="report-card-header-row">
-                      <h4 style={{ color: "#fbbf24", display: "flex", alignItems: "center", gap: "8px", margin: 0 }}>
-                        <Sparkles size={18} />
-                        <span>Weak Bullet Points & Suggested STAR / XYZ Rewrites</span>
-                      </h4>
-                      <span className="docs-tag">XYZ FORMULA</span>
+                {/* 3. Consider Removing */}
+                {report.recommendedRemovals?.length > 0 && (
+                  <div style={{ background: "var(--bg-card)", border: "1px solid var(--border-glass)", borderRadius: "14px", padding: "24px", marginTop: "18px", boxShadow: "var(--shadow-glass)" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#f43f5e", marginBottom: "16px" }}>
+                      <MinusCircle size={20} />
+                      <h3 style={{ fontSize: "1.15rem", fontWeight: 700, color: "var(--text-primary)", margin: 0 }}>
+                        Consider Removing
+                      </h3>
                     </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                      {report.recommendedRemovals.map((rem, idx) => (
+                        <div key={idx} style={{ background: "rgba(239, 68, 68, 0.08)", border: "1px solid rgba(239, 68, 68, 0.25)", borderRadius: "10px", padding: "16px" }}>
+                          <strong style={{ color: "#dc2626", fontSize: "0.9rem", display: "block", marginBottom: "4px" }}>
+                            {rem.category}: {rem.issue}
+                          </strong>
+                          <p style={{ color: "var(--text-secondary)", fontSize: "0.88rem", margin: 0, lineHeight: 1.5 }}>
+                            {rem.recommendation}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
-                    <div className="weak-bullets-list" style={{ marginTop: "16px" }}>
-                      {report.weakBullets.map((b, idx) => (
-                        <div key={idx} className="weak-bullet-item">
-                          <div className="bullet-original">
-                            <span className="bullet-label original">Original:</span>
-                            <p>"{b.original}"</p>
-                            <span className="bullet-issue">Issue: {b.issue}</span>
+                {/* 4. Job Description Alignment */}
+                {report.jdTailoredSuggestions?.length > 0 && (
+                  <div style={{ background: "var(--bg-card)", border: "1px solid var(--border-glass)", borderRadius: "14px", padding: "24px", marginTop: "18px", boxShadow: "var(--shadow-glass)" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "var(--accent-cyan)", marginBottom: "16px" }}>
+                      <Target size={20} />
+                      <h3 style={{ fontSize: "1.15rem", fontWeight: 700, color: "var(--text-primary)", margin: 0 }}>
+                        Job Description Alignment & Missing Keywords
+                      </h3>
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                      {report.jdTailoredSuggestions.map((jd, idx) => (
+                        <div key={idx} style={{ background: "var(--bg-surface-2)", border: "1px solid var(--border-subtle)", borderRadius: "10px", padding: "16px" }}>
+                          <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "10px" }}>
+                            {jd.missingKeywords?.map((kw, kIdx) => (
+                              <span key={kIdx} style={{ fontSize: "0.78rem", background: "rgba(56, 189, 248, 0.15)", color: "var(--accent-cyan)", padding: "3px 8px", borderRadius: "6px", fontWeight: 600 }}>
+                                + {kw}
+                              </span>
+                            ))}
                           </div>
-
-                          <div className="bullet-suggested">
-                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                              <span className="bullet-label suggested">Suggested STAR Rewrite:</span>
-                              <button
-                                type="button"
-                                className="bullet-copy-btn"
-                                onClick={() => copyText(b.suggestedRewrite, `bullet_${idx}`)}
-                              >
-                                {copiedSection === `bullet_${idx}` ? <Check size={13} /> : <Copy size={13} />}
-                                <span>{copiedSection === `bullet_${idx}` ? "Copied" : "Copy"}</span>
-                              </button>
-                            </div>
-                            <p className="suggested-text">"{b.suggestedRewrite}"</p>
-                          </div>
+                          <p style={{ color: "var(--text-secondary)", fontSize: "0.88rem", margin: 0, lineHeight: 1.5 }}>
+                            {jd.recommendation}
+                          </p>
                         </div>
                       ))}
                     </div>
@@ -716,165 +657,231 @@ ${report.prioritizedImprovements?.map((p) => `[${p.priority}] ${p.issue}\n-> Act
         )}
 
         {/* =========================================================
-            WORKSPACE TAB 2: AI RESUME BUILDER & LATEX STUDIO
+            TAB 2: INTERACTIVE LATEX BUILDER STUDIO
         ========================================================= */}
         {workspaceTab === "builder" && (
-          <div className="builder-workspace-grid">
-            {/* Left: Guided Conversational AI Assistant */}
-            <section className="builder-chat-card">
-              <div className="builder-card-header">
-                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                  <Bot size={20} style={{ color: "var(--cyan-bright)" }} />
-                  <h3>Guided Conversational Resume Architect</h3>
+          <div style={{ marginTop: "24px" }}>
+            {/* Instructional Reference Example Panel */}
+            <div
+              style={{
+                background: "var(--bg-card)",
+                border: "1px solid var(--border-glass)",
+                borderRadius: "14px",
+                padding: "20px 24px",
+                marginBottom: "20px",
+                boxShadow: "var(--shadow-glass)",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
+                <Sparkles size={16} color="var(--accent-primary)" />
+                <strong style={{ fontSize: "0.95rem", color: "var(--text-primary)" }}>
+                  What Good Information Looks Like (Instructional Reference)
+                </strong>
+                <span
+                  style={{
+                    fontSize: "0.75rem",
+                    fontFamily: "var(--font-mono)",
+                    background: "var(--accent-soft)",
+                    color: "var(--accent-primary)",
+                    padding: "2px 8px",
+                    borderRadius: "6px",
+                    fontWeight: 700,
+                  }}
+                >
+                  EXAMPLE ONLY
+                </span>
+              </div>
+              <p style={{ fontSize: "0.85rem", color: "var(--text-secondary)", margin: "0 0 14px", lineHeight: 1.5 }}>
+                Use this format as a reference when answering the assistant. Concrete engineering metrics and active verbs yield the strongest LaTeX resume output. This reference is never injected into your document.
+              </p>
+
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "14px" }}>
+                <div style={{ background: "var(--bg-surface-2)", border: "1px solid var(--border-subtle)", borderRadius: "10px", padding: "14px" }}>
+                  <strong style={{ fontSize: "0.82rem", color: "var(--accent-primary)", display: "block", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                    Project Impact Example
+                  </strong>
+                  <p style={{ fontSize: "0.82rem", color: "var(--text-primary)", margin: "0 0 4px", fontWeight: 600 }}>
+                    Distributed Rate Limiter (Go, Redis, gRPC)
+                  </p>
+                  <p style={{ fontSize: "0.8rem", color: "var(--text-secondary)", margin: 0, lineHeight: 1.4 }}>
+                    Engineered token-bucket rate limiter handling 120k req/sec with 0.8ms p99 latency, reducing API downtime by 99.9%.
+                  </p>
                 </div>
-                <span className="builder-step-pill">STEP: {builderStep.toUpperCase()}</span>
+
+                <div style={{ background: "var(--bg-surface-2)", border: "1px solid var(--border-subtle)", borderRadius: "10px", padding: "14px" }}>
+                  <strong style={{ fontSize: "0.82rem", color: "var(--accent-cyan)", display: "block", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                    Experience Bullet Example
+                  </strong>
+                  <p style={{ fontSize: "0.82rem", color: "var(--text-primary)", margin: "0 0 4px", fontWeight: 600 }}>
+                    Software Engineer at TechCorp
+                  </p>
+                  <p style={{ fontSize: "0.8rem", color: "var(--text-secondary)", margin: 0, lineHeight: 1.4 }}>
+                    Spearheaded database query optimization and Redis caching, reducing server compute costs by $24k annually.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px" }}>
+              {/* Left: Conversational Assistant */}
+              <div style={{ background: "var(--bg-card)", border: "1px solid var(--border-glass)", borderRadius: "14px", padding: "24px", display: "flex", flexDirection: "column", height: "600px", boxShadow: "var(--shadow-glass)" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", borderBottom: "1px solid var(--border-subtle)", paddingBottom: "14px", marginBottom: "16px" }}>
+                <Code size={18} color="var(--accent-primary)" />
+                <h3 style={{ fontSize: "1.1rem", fontWeight: 700, color: "var(--text-primary)", margin: 0 }}>
+                  Conversational Resume Assistant
+                </h3>
               </div>
 
-              <div className="builder-messages-pane">
+              {/* Chat Message Stream */}
+              <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: "12px", paddingRight: "8px" }}>
                 {chatMessages.map((msg, idx) => (
-                  <div key={idx} className={`chat-bubble-wrap ${msg.sender}`}>
-                    <div className={`chat-bubble ${msg.sender}`}>
-                      <p>{msg.text}</p>
-                    </div>
+                  <div
+                    key={idx}
+                    style={{
+                      alignSelf: msg.sender === "user" ? "flex-end" : "flex-start",
+                      maxWidth: "85%",
+                      padding: "12px 16px",
+                      borderRadius: "12px",
+                      background: msg.sender === "user" ? "var(--accent-primary)" : "var(--bg-surface-2)",
+                      color: msg.sender === "user" ? "#ffffff" : "var(--text-primary)",
+                      fontSize: "0.9rem",
+                      lineHeight: 1.5,
+                      border: msg.sender === "user" ? "none" : "1px solid var(--border-subtle)",
+                    }}
+                  >
+                    {msg.text}
                   </div>
                 ))}
                 {isAiThinking && (
-                  <div className="chat-bubble-wrap ai">
-                    <div className="chat-bubble ai thinking">
-                      <RefreshCw size={14} className="spin-icon" />
-                      <span>Structuring resume data...</span>
-                    </div>
+                  <div style={{ alignSelf: "flex-start", color: "var(--text-muted)", fontSize: "0.85rem", fontStyle: "italic" }}>
+                    AI Architect is thinking...
                   </div>
                 )}
               </div>
 
-              <div className="builder-input-bar">
+              {/* Pre-Generation Confirmation Prompt */}
+              {confirmationPending && (
+                <div style={{ background: "var(--accent-soft)", border: "1px solid var(--accent-border)", borderRadius: "10px", padding: "14px", margin: "12px 0" }}>
+                  <p style={{ margin: "0 0 10px", fontSize: "0.88rem", color: "var(--accent-primary)", fontWeight: 600 }}>
+                    Would you like to edit anything before I generate the final resume?
+                  </p>
+                  <div style={{ display: "flex", gap: "10px" }}>
+                    <button
+                      type="button"
+                      onClick={() => handleSendMessage(null, true)}
+                      style={{
+                        background: "var(--accent-primary)",
+                        color: "#ffffff",
+                        border: "none",
+                        borderRadius: "6px",
+                        padding: "8px 16px",
+                        fontSize: "0.85rem",
+                        fontWeight: 700,
+                        cursor: "pointer",
+                      }}
+                    >
+                      Confirm & Compile LaTeX
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Chat Input Box */}
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  handleSendMessage();
+                }}
+                style={{ display: "flex", gap: "10px", marginTop: "12px" }}
+              >
                 <input
                   type="text"
-                  className="builder-chat-input"
-                  placeholder="Type your response (e.g. your skills, role, or past projects)..."
+                  placeholder="Type your response or edit request (e.g. 'change target role to DevOps Specialist')..."
                   value={chatInput}
                   onChange={(e) => setChatInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") handleSendBuilderChat();
+                  style={{
+                    flex: 1,
+                    background: "var(--bg-input)",
+                    border: "1px solid var(--border-medium)",
+                    borderRadius: "8px",
+                    padding: "10px 14px",
+                    color: "var(--text-primary)",
+                    fontSize: "0.9rem",
                   }}
                 />
                 <button
-                  type="button"
-                  className="builder-send-btn"
-                  disabled={!chatInput.trim() || isAiThinking}
-                  onClick={handleSendBuilderChat}
+                  type="submit"
+                  disabled={isAiThinking || !chatInput.trim()}
+                  style={{
+                    background: "var(--accent-primary)",
+                    color: "#ffffff",
+                    border: "none",
+                    borderRadius: "8px",
+                    padding: "10px 18px",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
                 >
                   <Send size={16} />
                 </button>
-              </div>
-            </section>
+              </form>
+            </div>
 
-            {/* Right: Live Structured Resume Preview & Compile-Ready LaTeX Actions */}
-            <section className="builder-preview-card">
-              <div className="builder-preview-top">
-                <div>
-                  <h3>Live Resume Document Preview</h3>
-                  <p>Real-time ATS structured preview. Verified user information only.</p>
-                </div>
-                <div className="builder-actions-row">
+            {/* Right: Compile-Ready LaTeX Code Preview */}
+            <div style={{ background: "var(--bg-card)", border: "1px solid var(--border-glass)", borderRadius: "14px", padding: "24px", display: "flex", flexDirection: "column", height: "600px", boxShadow: "var(--shadow-glass)" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--border-subtle)", paddingBottom: "14px", marginBottom: "16px" }}>
+                <h3 style={{ fontSize: "1.1rem", fontWeight: 700, color: "var(--text-primary)", margin: 0 }}>
+                  Compile-Ready LaTeX Document
+                </h3>
+                {latexCode && (
                   <button
                     type="button"
-                    className="report-action-btn"
                     onClick={downloadLatexFile}
+                    style={{
+                      background: "var(--accent-primary)",
+                      color: "#ffffff",
+                      border: "none",
+                      borderRadius: "6px",
+                      padding: "6px 14px",
+                      fontSize: "0.82rem",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                    }}
                   >
                     <Download size={14} />
-                    <span>Download .tex (LaTeX)</span>
+                    <span>Download .tex</span>
                   </button>
-                  <button
-                    type="button"
-                    className="report-action-btn secondary"
-                    onClick={handleSendToAtsAudit}
-                  >
-                    <Zap size={14} />
-                    <span>Run ATS Audit Loop</span>
-                  </button>
-                </div>
+                )}
               </div>
 
-              {/* Document Paper Preview */}
-              <div className="paper-preview-wrap">
-                <div className="paper-preview">
-                  <header className="paper-header">
-                    <h2>{builtResume.name}</h2>
-                    <p className="paper-contact">
-                      {builtResume.phone} | {builtResume.email} | {builtResume.location}
-                    </p>
-                    <p className="paper-links">{builtResume.linkedin} | {builtResume.github}</p>
-                  </header>
-
-                  <section className="paper-section">
-                    <h4>PROFESSIONAL SUMMARY</h4>
-                    <p>{builtResume.summary}</p>
-                  </section>
-
-                  <section className="paper-section">
-                    <h4>TECHNICAL SKILLS</h4>
-                    <p><strong>Languages:</strong> {builtResume.skills.languages?.join(", ")}</p>
-                    <p><strong>Frameworks:</strong> {builtResume.skills.frameworks?.join(", ")}</p>
-                    <p><strong>Databases:</strong> {builtResume.skills.databases?.join(", ")}</p>
-                    <p><strong>Cloud/Tools:</strong> {builtResume.skills.tools?.join(", ")}</p>
-                  </section>
-
-                  <section className="paper-section">
-                    <h4>WORK EXPERIENCE</h4>
-                    {builtResume.experience?.map((exp, i) => (
-                      <div key={i} className="paper-item">
-                        <div className="paper-item-top">
-                          <strong>{exp.title} - {exp.company}</strong>
-                          <span>{exp.dateRange}</span>
-                        </div>
-                        <ul>
-                          {exp.bullets?.map((b, bi) => (
-                            <li key={bi}>{b}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    ))}
-                  </section>
-
-                  <section className="paper-section">
-                    <h4>TECHNICAL PROJECTS</h4>
-                    {builtResume.projects?.map((proj, pi) => (
-                      <div key={pi} className="paper-item">
-                        <div className="paper-item-top">
-                          <strong>{proj.name}</strong>
-                          <span>{proj.tech}</span>
-                        </div>
-                        <ul>
-                          {proj.bullets?.map((b, bi) => (
-                            <li key={bi}>{b}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    ))}
-                  </section>
-
-                  <section className="paper-section">
-                    <h4>EDUCATION</h4>
-                    {builtResume.education?.map((edu, ei) => (
-                      <div key={ei} className="paper-item">
-                        <div className="paper-item-top">
-                          <strong>{edu.degree} - {edu.institution}</strong>
-                          <span>{edu.dateRange}</span>
-                        </div>
-                        {edu.details && <p style={{ fontSize: "11px", color: "#666" }}>{edu.details}</p>}
-                      </div>
-                    ))}
-                  </section>
-                </div>
-              </div>
-            </section>
+              <textarea
+                readOnly
+                value={latexCode || "% Complete the conversational interview on the left to compile your clean LaTeX resume.\n% No fake placeholder candidate data will be generated."}
+                style={{
+                  flex: 1,
+                  background: "var(--bg-input)",
+                  border: "1px solid var(--border-medium)",
+                  borderRadius: "8px",
+                  padding: "16px",
+                  color: "var(--accent-primary)",
+                  fontFamily: "var(--font-mono)",
+                  fontSize: "0.85rem",
+                  lineHeight: 1.5,
+                  resize: "none",
+                }}
+              />
+            </div>
           </div>
-        )}
-      </div>
-    </main>
-  );
+        </div>
+      )}
+    </div>
+  </main>
+);
 }
 
 export default ResumeAnalyzer;

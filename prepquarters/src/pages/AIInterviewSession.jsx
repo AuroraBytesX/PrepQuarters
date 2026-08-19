@@ -32,7 +32,9 @@ import {
   Check,
   Download,
   X,
+  Layers,
 } from "lucide-react";
+import { API_BASE_URL } from "../config/api";
 import "./AIInterviewSession.css";
 
 function AIInterviewSession() {
@@ -294,7 +296,7 @@ function AIInterviewSession() {
               console.info("[STT_REQUEST_SENT] Dispatching transcription request to Groq Whisper...");
               setMicStatusMessage("Transcribing audio via neural Whisper pipeline...");
 
-              const res = await fetch("https://prepquarters-backend.onrender.com/api/interview/transcribe-audio", {
+              const res = await fetch(`${API_BASE_URL}/api/interview/transcribe-audio`, {
                 method: "POST",
                 headers: {
                   Authorization: `Bearer ${token}`,
@@ -319,7 +321,7 @@ function AIInterviewSession() {
                 console.info("[TRANSCRIPT_RENDERED] Transcript successfully rendered into response terminal.");
                 setMicStatusMessage(`Transcribed via ${data.provider}: "${serverText.slice(0, 60)}${serverText.length > 60 ? "..." : ""}"`);
               } else {
-                const msg = data.message || "Voice captured. To enable cloud Whisper, add GROQ_API_KEY (free at console.groq.com) in server/.env. Keyboard input is always active.";
+                const msg = data.message || "Could not detect clear speech. Please speak clearly into your microphone or type your answer.";
                 console.warn("[STT_ERROR] Server transcription response message:", msg);
                 setMicStatusMessage(msg);
               }
@@ -403,7 +405,7 @@ function AIInterviewSession() {
 
   const fetchSessionState = async (sessionId, token) => {
     try {
-      const res = await fetch(`https://prepquarters-backend.onrender.com/api/interview/${sessionId}`, {
+      const res = await fetch(`${API_BASE_URL}/api/interview/${sessionId}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -445,7 +447,7 @@ function AIInterviewSession() {
 
     try {
       const token = localStorage.getItem("prepquartersToken");
-      const res = await fetch(`https://prepquarters-backend.onrender.com/api/interview/${session._id}/run-code`, {
+      const res = await fetch(`${API_BASE_URL}/api/interview/${session._id}/run-code`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -487,7 +489,7 @@ function AIInterviewSession() {
     const token = localStorage.getItem("prepquartersToken");
 
     try {
-      const res = await fetch(`https://prepquarters-backend.onrender.com/api/interview/${session._id}/answer`, {
+      const res = await fetch(`${API_BASE_URL}/api/interview/${session._id}/answer`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -544,9 +546,16 @@ function AIInterviewSession() {
     setIsSubmitting(true);
     stopSpeaking();
 
+    // Immediately stop timer
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+
     try {
       const token = localStorage.getItem("prepquartersToken");
-      const res = await fetch(`https://prepquarters-backend.onrender.com/api/interview/${session._id}/finish`, {
+      const sessionId = session._id || session.id;
+      const res = await fetch(`${API_BASE_URL}/api/interview/${sessionId}/finish`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -555,9 +564,15 @@ function AIInterviewSession() {
       });
 
       const data = await res.json();
-      if (data.success && data.overallEvaluation) {
+      const finalEval = data.overallEvaluation || data.session?.overallEvaluation;
+      if (data.success && finalEval) {
+        if (data.session) {
+          setSession(data.session);
+        }
         setIsSessionCompleted(true);
-        setFinalScorecard(data.overallEvaluation);
+        setFinalScorecard(finalEval);
+      } else {
+        setError(data.message || "Failed to finalize session scorecard.");
       }
     } catch (err) {
       console.error("Error finalizing session:", err);
@@ -640,7 +655,7 @@ function AIInterviewSession() {
     const isHire = hireRec.includes("Hire") && !hireRec.includes("No Hire");
 
     return (
-      <main className="ai-session-page results-page bg-grid-cyber">
+      <main className="ai-session-page results-page">
         <section className="results-container">
           <div className="results-header-banner">
             <p className="results-eyebrow">
@@ -768,7 +783,7 @@ function AIInterviewSession() {
               className="results-primary-btn"
               onClick={() => {
                 const lines = [
-                  `# PrepQuarters Candidate Evaluation Report`,
+                  `# PrepQuarters Candidate Evaluation Scorecard`,
                   `**Role:** ${session?.role || "Candidate"} | **Domain:** ${session?.domain || "Software Engineering"} | **Difficulty:** ${session?.difficulty || "Hard"}`,
                   `**Company Benchmark:** ${session?.companyStyle || "General Tech"}`,
                   `**Date:** ${new Date().toLocaleDateString()}`,
@@ -803,17 +818,59 @@ function AIInterviewSession() {
                   });
                 }
 
+                if (session?.questions?.length) {
+                  lines.push(`\n## Detailed Scenario Transcripts & Evaluations`);
+                  session.questions.forEach((q, idx) => {
+                    lines.push(`\n### Scenario ${idx + 1}: ${q.topic || "Technical Assessment"}`);
+                    lines.push(`**Question:** ${q.questionText}`);
+                    lines.push(`\n**Candidate Answer:**\n${q.candidateAnswer || "No answer recorded."}`);
+                    if (q.evaluation) {
+                      lines.push(`\n**Scenario Score:** ${q.evaluation.score}/10`);
+                      lines.push(`**Assessment:** ${q.evaluation.technicalAccuracy}`);
+                    }
+                  });
+                }
+
                 const blob = new Blob([lines.join("\n")], { type: "text/markdown;charset=utf-8;" });
                 const url = URL.createObjectURL(blob);
                 const link = document.createElement("a");
                 link.href = url;
-                link.download = `PrepQuarters_Evaluation_${(session?.domain || "General").replace(/\s+/g, "_")}_${Date.now()}.md`;
+                link.download = `PrepQuarters_Scorecard_${(session?.domain || "General").replace(/\s+/g, "_")}_${Date.now()}.md`;
                 link.click();
                 URL.revokeObjectURL(url);
               }}
             >
               <Download size={16} aria-hidden="true" />
-              <span>Download Evaluation Report (.md)</span>
+              <span>Download Evaluation Scorecard (.md)</span>
+            </button>
+
+            <button
+              type="button"
+              className="results-secondary-btn"
+              onClick={() => {
+                const telemetryPayload = {
+                  sessionId: session?._id || session?.id,
+                  candidateRole: session?.role,
+                  domain: session?.domain,
+                  difficulty: session?.difficulty,
+                  companyStyle: session?.companyStyle,
+                  timestamp: new Date().toISOString(),
+                  overallEvaluation: finalScorecard,
+                  questions: session?.questions || [],
+                };
+                const blob = new Blob([JSON.stringify(telemetryPayload, null, 2)], {
+                  type: "application/json;charset=utf-8;",
+                });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement("a");
+                link.href = url;
+                link.download = `PrepQuarters_Telemetry_${Date.now()}.json`;
+                link.click();
+                URL.revokeObjectURL(url);
+              }}
+            >
+              <Download size={14} aria-hidden="true" />
+              <span>Download Telemetry (.json)</span>
             </button>
 
             <button
@@ -831,17 +888,19 @@ function AIInterviewSession() {
               onClick={() => navigate(`/practice/progress`)}
             >
               <TrendingUp size={15} aria-hidden="true" />
-              <span>View Updated Skill Analytics</span>
+              <span>View Skill Analytics</span>
             </button>
 
-            <button
-              type="button"
-              className="results-secondary-btn"
-              onClick={() => navigate(`/practice/replay/${session._id}`)}
-            >
-              <RotateCcw size={15} aria-hidden="true" />
-              <span>Review Transcript Replay</span>
-            </button>
+            {session?._id && (
+              <button
+                type="button"
+                className="results-secondary-btn"
+                onClick={() => navigate(`/practice/replay/${session._id}`)}
+              >
+                <RotateCcw size={15} aria-hidden="true" />
+                <span>Transcript Replay</span>
+              </button>
+            )}
 
             <button
               type="button"
@@ -859,7 +918,7 @@ function AIInterviewSession() {
 
   // 2. ACTIVE AI INTERVIEW COCKPIT ROOM
   return (
-    <main className="ai-session-page bg-grid-cyber">
+    <main className="ai-session-page">
       <section className="ai-session-container">
         {/* Cockpit Telemetry Bar */}
         <header className="session-top-bar">
@@ -918,8 +977,25 @@ function AIInterviewSession() {
               <span>{isSpeaking ? "Speaking..." : "Read Aloud"}</span>
             </button>
 
-            {/* Time-Based Live Countdown Timer */}
+            {/* Time-Based Live Countdown Timer / Untimed Multi-Stage Loop */}
             {(() => {
+              const isMixed = session?.interviewType === "Mixed" || (session?.interviewType || "").includes("Mixed");
+              if (isMixed) {
+                return (
+                  <div
+                    className="session-timer"
+                    style={{
+                      borderColor: "rgba(6, 182, 212, 0.4)",
+                      color: "var(--cyan-bright)",
+                      background: "rgba(6, 182, 212, 0.08)",
+                    }}
+                  >
+                    <Layers size={14} aria-hidden="true" />
+                    <span>Mixed Stage {(currentQuestionIndex || 0) + 1} (Untimed Loop)</span>
+                  </div>
+                );
+              }
+
               const sessionDurationMinutes = session?.sessionDurationMinutes || (parseInt(session?.selectedDuration, 10) || 10);
               const sessionTotalSecsLimit = sessionDurationMinutes * 60;
               const remainingSessionSeconds = Math.max(0, sessionTotalSecsLimit - totalSessionSeconds);
@@ -943,11 +1019,12 @@ function AIInterviewSession() {
             <button
               type="button"
               className="dashboard-secondary-btn"
-              style={{ padding: "6px 12px", fontSize: "11px", fontWeight: "700" }}
+              style={{ padding: "6px 12px", fontSize: "11px", fontWeight: "700", opacity: isSubmitting ? 0.7 : 1 }}
               onClick={handleFinishSessionEarly}
+              disabled={isSubmitting}
               title="Finish interview session and generate final scorecard"
             >
-              <span>Finish Interview</span>
+              <span>{isSubmitting ? "Generating interview report..." : "Finish Interview"}</span>
             </button>
           </div>
         </header>
@@ -1011,8 +1088,8 @@ function AIInterviewSession() {
               <span>{showHint ? "Hide Hint" : "Request Hint"}</span>
             </button>
 
-            {/* 2. View Reference Solution (Only unlocked after requesting a hint - never pre-revealed) */}
-            {hintRequested && (currentQuestion?.questionType === "Coding" || currentQuestion?.referenceSolution) && (
+            {/* 2. View Reference Solution (Always unlocked for Mixed interview, or after requesting a hint) */}
+            {(session?.interviewType === "Mixed" || (session?.interviewType || "").includes("Mixed") || hintRequested || currentQuestion?.questionType === "Coding" || currentQuestion?.referenceSolution) && (
               <button
                 type="button"
                 onClick={() => setShowSolutionModal(true)}
@@ -1022,13 +1099,14 @@ function AIInterviewSession() {
                   gap: "6px",
                   padding: "5px 12px",
                   borderRadius: "8px",
-                  background: "rgba(168, 85, 247, 0.12)",
-                  border: "1px solid rgba(168, 85, 247, 0.35)",
+                  background: "rgba(168, 85, 247, 0.15)",
+                  border: "1px solid rgba(168, 85, 247, 0.4)",
                   color: "#c084fc",
                   fontSize: "12px",
                   fontWeight: "600",
                   cursor: "pointer",
                 }}
+                title="Inspect reference solution and architectural benchmark"
               >
                 <Code size={13} />
                 <span>View Reference Solution Benchmark</span>
@@ -1997,8 +2075,10 @@ function AIInterviewSession() {
                 type="button"
                 className="finish-session-btn"
                 onClick={handleFinishSessionEarly}
+                disabled={isSubmitting}
+                style={{ opacity: isSubmitting ? 0.7 : 1 }}
               >
-                <span>Conclude & Generate Scorecard</span>
+                <span>{isSubmitting ? "Generating interview report..." : "Conclude & Generate Scorecard"}</span>
                 <ArrowRight size={16} aria-hidden="true" />
               </button>
             </div>

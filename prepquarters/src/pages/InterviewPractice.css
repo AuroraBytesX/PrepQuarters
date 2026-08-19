@@ -1,5 +1,5 @@
 /* =========================================================
-   INTERVIEW PRACTICE STYLING
+   INTERVIEW PRACTICE STYLING - UNIFIED THEME COMPLIANT
 ========================================================= */
 
 .ai-interview-page {
@@ -14,31 +14,34 @@
   text-align: center;
   padding: 50px 30px;
   border-radius: 20px;
-  background: linear-gradient(135deg, #ffffff 0%, #faf5ff 100%);
-  border: 1px solid #eadfd8;
-  box-shadow: 0 10px 30px rgba(91, 66, 61, 0.05);
+  background: var(--bg-card);
+  border: 1px solid var(--border-glass);
+  box-shadow: var(--shadow-glass);
   margin-bottom: 40px;
+  backdrop-filter: blur(14px);
 }
 
 .ai-interview-eyebrow {
   font-size: 11px;
   font-weight: 800;
   letter-spacing: 1.6px;
-  color: #7c3aed;
+  color: var(--accent-primary);
   margin: 0 0 12px;
+  text-transform: uppercase;
 }
 
 .ai-interview-hero h1 {
   font-size: 34px;
   font-weight: 800;
-  color: #1f2937;
+  color: var(--text-primary);
   margin: 0 0 14px;
+  letter-spacing: -0.02em;
 }
 
 .ai-interview-description {
   font-size: 16px;
   line-height: 1.6;
-  color: #4b5563;
+  color: var(--text-secondary);
   max-width: 680px;
   margin: 0 auto 28px;
 }
@@ -50,17 +53,17 @@
   padding: 14px 28px;
   border: none;
   border-radius: 999px;
-  background: #7c3aed;
+  background: var(--accent-primary);
   color: #ffffff;
   font-size: 15px;
   font-weight: 700;
   cursor: pointer;
-  box-shadow: 0 6px 20px rgba(124, 58, 237, 0.3);
+  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.35);
   transition: transform 0.2s ease, background-color 0.2s ease;
 }
 
 .ai-interview-start-button:hover {
-  background: #6d28d9;
+  background: var(--accent-hover);
   transform: translateY(-2px);
 }
 
@@ -74,9 +77,15 @@
 .ai-interview-info-card {
   padding: 28px 24px;
   border-radius: 16px;
-  background: #ffffff;
-  border: 1px solid #eadfd8;
-  box-shadow: 0 4px 15px rgba(91, 66, 61, 0.04);
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  box-shadow: var(--shadow-glass);
+  transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.ai-interview-info-card:hover {
+  border-color: var(--border-hover);
+  transform: translateY(-2px);
 }
 
 .info-card-icon {
@@ -86,22 +95,22 @@
   align-items: center;
   justify-content: center;
   border-radius: 12px;
-  background: #f5efff;
-  color: #7c3aed;
+  background: var(--accent-soft);
+  color: var(--accent-primary);
   margin-bottom: 16px;
 }
 
 .ai-interview-info-card h2 {
   font-size: 18px;
   font-weight: 700;
-  color: #1f2937;
+  color: var(--text-primary);
   margin: 0 0 8px;
 }
 
 .ai-interview-info-card p {
   font-size: 14px;
   line-height: 1.5;
-  color: #6b7280;
+  color: var(--text-secondary);
   margin: 0;
 }
 
@@ -120,59 +129,28 @@
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
-  transition: background-color 0.2s ease, border-color 0.2s ease;
+  transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
 }
 
 .ai-interview-back-button {
-  border: 1px solid #d8c4e8;
-  background: #ffffff;
-  color: #4b5563;
+  border: 1px solid var(--border-medium);
+  background: var(--bg-card);
+  color: var(--text-primary);
 }
 
 .ai-interview-back-button:hover {
-  background: #faf5ff;
-  border-color: #7c3aed;
-  color: #7c3aed;
+  background: var(--bg-card-hover);
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
 }
 
 .ai-interview-library-button {
-  border: 1px solid #7c3aed;
-  background: #f5efff;
-  color: #7c3aed;
+  border: 1px solid var(--accent-border);
+  background: var(--accent-soft);
+  color: var(--accent-primary);
 }
 
 .ai-interview-library-button:hover {
-  background: #ede9fe;
-}
-
-/* Dark mode */
-body.dark-mode .ai-interview-hero {
-  background: linear-gradient(135deg, #111827 0%, #1a1625 100%);
-  border-color: #374151;
-}
-
-body.dark-mode .ai-interview-hero h1,
-body.dark-mode .ai-interview-info-card h2 {
-  color: #f9fafb;
-}
-
-body.dark-mode .ai-interview-description,
-body.dark-mode .ai-interview-info-card p {
-  color: #9ca3af;
-}
-
-body.dark-mode .ai-interview-info-card {
-  background: #111827;
-  border-color: #374151;
-}
-
-body.dark-mode .info-card-icon {
-  background: #1f2937;
-  color: #c4b5fd;
-}
-
-body.dark-mode .ai-interview-back-button {
-  background: #111827;
-  border-color: #374151;
-  color: #cbd5e1;
+  background: var(--accent-primary);
+  color: #ffffff;
 }

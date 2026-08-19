@@ -141,7 +141,7 @@ function Features() {
   ];
 
   return (
-    <main className="prepquarters-home bg-grid-cyber" style={{ paddingBottom: "100px" }}>
+    <main className="prepquarters-home" style={{ paddingBottom: "100px" }}>
       <section className="features-section" style={{ paddingTop: "70px" }}>
         <div className="section-heading">
           <p>ENGINEERING CAPABILITIES</p>

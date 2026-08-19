@@ -152,4 +152,119 @@ router.get("/docs", (req, res) => {
   }
 });
 
+/* =========================================
+   PROVIDER CONFIGURATION & BYOK VERIFICATION
+========================================= */
+router.get("/provider-config", (req, res) => {
+  res.json({
+    success: true,
+    platformRateLimit: {
+      requestsPerMinute: 40,
+      description: "Platform-managed inference is rate limited to 40 requests per minute.",
+    },
+    supportedProviders: [
+      { id: "platform", name: "My API (PrepQuarters Platform)", description: "Use built-in platform intelligence with 40 req/min rate limit.", requiresKey: false },
+      { id: "openai", name: "OpenAI (BYOK)", description: "Connect your OpenAI API key for GPT-4o and reasoning models.", requiresKey: true },
+      { id: "anthropic", name: "Anthropic (BYOK)", description: "Connect your Anthropic API key for Claude 3.5 models.", requiresKey: true },
+      { id: "xai", name: "xAI (BYOK)", description: "Connect your xAI API key for Grok models.", requiresKey: true },
+    ],
+  });
+});
+
+router.post("/verify-byok", async (req, res) => {
+  try {
+    const { provider = "openai", apiKey = "" } = req.body;
+    if (!apiKey || typeof apiKey !== "string" || apiKey.trim().length < 10) {
+      return res.status(400).json({
+        success: false,
+        valid: false,
+        message: "Please enter a valid API key string.",
+      });
+    }
+
+    const { callAiChatCompletion } = require("../services/AiProviderService");
+    const testResult = await callAiChatCompletion({
+      messages: [{ role: "user", content: "Say 'READY' in one word." }],
+      options: { max_tokens: 10, temperature: 0.1, jsonMode: false },
+      providerConfig: { mode: "byok", provider, apiKey: apiKey.trim() },
+    });
+
+    if (testResult.success) {
+      res.json({
+        success: true,
+        valid: true,
+        provider,
+        message: `${provider.toUpperCase()} API key verified successfully.`,
+      });
+    } else {
+      res.status(400).json({
+        success: false,
+        valid: false,
+        message: testResult.error || "Failed to verify credentials with provider.",
+      });
+    }
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      valid: false,
+      message: "Verification failed.",
+    });
+  }
+});
+
+/* =========================================
+   CONTACT / CONNECT FORM
+========================================= */
+const { sendContactEmail, isValidEmail } = require("../services/EmailService");
+
+router.post("/contact", async (req, res) => {
+  try {
+    const { name, email, message } = req.body;
+    const cleanName = String(name || "").trim() || "Candidate";
+    const cleanEmail = String(email || "").trim().toLowerCase();
+    const cleanMessage = String(message || "").trim();
+
+    if (!cleanEmail || !isValidEmail(cleanEmail)) {
+      return res.status(400).json({
+        success: false,
+        message: "Please provide a valid email address.",
+      });
+    }
+
+    if (!cleanMessage || cleanMessage.length < 5) {
+      return res.status(400).json({
+        success: false,
+        message: "Message must be at least 5 characters long.",
+      });
+    }
+
+    const emailResult = await sendContactEmail({
+      name: cleanName,
+      email: cleanEmail,
+      message: cleanMessage,
+    });
+
+    if (emailResult.success) {
+      res.json({
+        success: true,
+        delivered: emailResult.delivered,
+        recipient: emailResult.recipient,
+        message: emailResult.message || "Thank you for reaching out. Your message has been received.",
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        delivered: false,
+        message: emailResult.message || "Could not deliver message to email service. Please try again.",
+      });
+    }
+  } catch (error) {
+    console.error("Contact form submission error:", error.message);
+    res.status(500).json({
+      success: false,
+      message: "Could not submit message. Please try again.",
+    });
+  }
+});
+
 module.exports = router;

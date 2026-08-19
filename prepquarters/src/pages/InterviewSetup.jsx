@@ -35,52 +35,17 @@ import {
   GitBranch,
   BrainCircuit,
 } from "lucide-react";
+import { API_BASE_URL } from "../config/api";
 import "./InterviewSetup.css";
 
 const MODALITIES = [
   {
-    id: "voice",
-    name: "AI Voice Interview",
-    badge: "VOICE TELEMETRY",
+    id: "voice_technical",
+    name: "AI Voice + Technical Interview",
+    badge: "VOICE & REASONING",
     icon: Radio,
-    color: "var(--cyan-bright)",
-    desc: "Live conversational voice mock with real-time audio spectrum visualization, Groq Whisper STT, and configurable neural voice feedback.",
-    supportsLanguages: false,
-  },
-  {
-    id: "technical",
-    name: "Technical Interview",
-    badge: "ARCHITECTURE & CONCEPTS",
-    icon: Terminal,
-    color: "#38bdf8",
-    desc: "Deep computer science fundamentals, API protocols, concurrency mechanics, and failure recovery trade-offs.",
-    supportsLanguages: true,
-  },
-  {
-    id: "coding",
-    name: "Coding Interview",
-    badge: "ALGORITHMIC SUITE",
-    icon: Code,
-    color: "#a78bfa",
-    desc: "Interactive code editor with executable test assertion runner, multi-language starter templates, and Big-O runtime analysis.",
-    supportsLanguages: true,
-  },
-  {
-    id: "ai_coding",
-    name: "AI Coding Interview",
-    badge: "CONVERSATIONAL CODE",
-    icon: Bot,
-    color: "#818cf8",
-    desc: "Interactive AI interviewer probing solution design, edge case assumptions, hints, and evaluating both implementation and explanation.",
-    supportsLanguages: true,
-  },
-  {
-    id: "system_design",
-    name: "System Design Interview",
-    badge: "HIGH SCALE ARCHITECTURE",
-    icon: Layers,
-    color: "#34d399",
-    desc: "High-scale distributed architectures, database partitioning, caching hierarchies, and regional failover patterns.",
+    color: "#10b981",
+    desc: "Live multi-turn technical interview with speech recognition (Groq Whisper), real-time transcription, and architectural reasoning probes.",
     supportsLanguages: true,
   },
   {
@@ -89,25 +54,25 @@ const MODALITIES = [
     badge: "STAR METHODOLOGY",
     icon: Users,
     color: "#f472b6",
-    desc: "Calibrated behavioral scenarios evaluating Situation, Task, Action, and Result with leadership and conflict resolution rubrics.",
+    desc: "Calibrated behavioral scenarios evaluating Situation, Task, Action, and Result with leadership and conflict resolution guidance.",
     supportsLanguages: false,
   },
   {
     id: "aptitude",
-    name: "Aptitude Interview",
+    name: "Aptitude & Reasoning Interview",
     badge: "COGNITIVE SPEED",
     icon: Activity,
     color: "#fbbf24",
-    desc: "Quantitative aptitude, logical deduction, probability, and data interpretation with verified mathematical proofs.",
+    desc: "Quantitative aptitude, logical deduction, probability, and data interpretation from sourced datasets.",
     supportsLanguages: false,
   },
   {
     id: "language_specific",
     name: "Language-Specific Technical Interview",
-    badge: "RUNTIME INTERNALS",
+    badge: "RUNTIME & DSA",
     icon: Cpu,
     color: "#60a5fa",
-    desc: "Language-calibrated rounds covering V8 Event Loop, Python GIL, Java JVM & Project Loom, Go scheduler, Rust borrow checker, and optional DSA.",
+    desc: "Language-calibrated rounds covering Python, Java, C++, Go, Rust, and SQL runtime internals and data structure implementation.",
     supportsLanguages: true,
   },
   {
@@ -116,16 +81,16 @@ const MODALITIES = [
     badge: "COMPANY BENCHMARK",
     icon: Building,
     color: "#f87171",
-    desc: "Mock interviews calibrated against publicly known evaluation patterns for Google, Meta, Amazon, Apple, Netflix, Uber, or Stripe.",
+    desc: "Mock interviews calibrated against publicly known evaluation patterns for Google, Meta, Amazon, Apple, Netflix, or Stripe.",
     supportsLanguages: true,
   },
   {
-    id: "mixed",
-    name: "Mixed Interview",
-    badge: "COMPREHENSIVE ROUND",
-    icon: Award,
-    color: "var(--cyan-bright)",
-    desc: "Complete multi-stage interview loop: Technical Architecture -> Coding -> Aptitude -> Behavioral STAR -> System Design.",
+    id: "system_design",
+    name: "System Design Interview",
+    badge: "HIGH SCALE ARCHITECTURE",
+    icon: Layers,
+    color: "#34d399",
+    desc: "High-scale distributed architectures, database partitioning, caching hierarchies, and regional failover trade-offs.",
     supportsLanguages: true,
   },
 ];
@@ -339,6 +304,8 @@ function InterviewSetup() {
   };
 
   const handleLaunchSession = async () => {
+    if (loading) return;
+
     if (!activeRoleName) {
       setError("Please select or enter a target role persona.");
       return;
@@ -384,7 +351,7 @@ function InterviewSetup() {
     };
 
     try {
-      const res = await fetch("https://prepquarters-backend.onrender.com/api/interview/start", {
+      const res = await fetch(`${API_BASE_URL}/api/interview/start`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -401,9 +368,9 @@ function InterviewSetup() {
 
       navigate("/practice/ai-interview/session", {
         state: {
-          sessionId: data.session._id,
+          sessionId: data.session._id || data.session.id,
           session: data.session,
-          initialQuestion: data.session.currentQuestion,
+          initialQuestion: data.session.currentQuestion || (data.session.questions ? data.session.questions[0] : null),
         },
       });
     } catch (err) {
@@ -417,7 +384,7 @@ function InterviewSetup() {
   const currentModalityObj = MODALITIES.find((m) => m.name === interviewType) || MODALITIES[0];
 
   return (
-    <main className="setup-page bg-grid-cyber">
+    <main className="setup-page">
       <div className="setup-container">
         {/* Navigation Bar */}
         <div className="setup-nav-row">

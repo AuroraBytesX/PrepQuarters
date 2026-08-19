@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Sparkles, CheckCircle2, ShieldCheck, ArrowRight, Activity, Clock } from "lucide-react";
+import { Sparkles, CheckCircle2, ShieldCheck, ArrowRight, Activity, Clock, Eye, EyeOff, KeyRound, X, AlertCircle } from "lucide-react";
+import { API_BASE_URL } from "./config/api";
+import { account, ID } from "./config/appwrite";
 
-function Login() {
+function Login({ initialMode = true }) {
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -14,7 +16,14 @@ function Login() {
     }
   }, [navigate]);
 
-  const [isLogin, setIsLogin] = useState(true);
+  const [isLogin, setIsLogin] = useState(() => {
+    if (location.pathname === "/signup") return false;
+    return initialMode;
+  });
+
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -25,6 +34,17 @@ function Login() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState("");
+
+  // Forgot password modal state
+  const [forgotModalOpen, setForgotModalOpen] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotStep, setForgotStep] = useState("request"); // 'request' | 'reset'
+  const [resetTokenInput, setResetTokenInput] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmNewPassword, setConfirmNewPassword] = useState("");
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotMessage, setForgotMessage] = useState("");
+  const [forgotMessageType, setForgotMessageType] = useState("");
 
   const handleChange = (event) => {
     const { name, value } = event.target;
@@ -54,7 +74,9 @@ function Login() {
     setMessage("");
     setMessageType("");
 
-    if (!formData.email || !formData.password) {
+    const cleanEmail = formData.email.trim().toLowerCase();
+
+    if (!cleanEmail || !formData.password) {
       setMessage("Please fill in all required fields.");
       setMessageType("error");
       setLoading(false);
@@ -62,7 +84,7 @@ function Login() {
     }
 
     if (!isLogin) {
-      if (!formData.name) {
+      if (!formData.name.trim()) {
         setMessage("Please provide your full name.");
         setMessageType("error");
         setLoading(false);
@@ -84,17 +106,17 @@ function Login() {
 
     try {
       const endpoint = isLogin
-        ? "https://prepquarters-backend.onrender.com/api/auth/login"
-        : "https://prepquarters-backend.onrender.com/api/auth/signup";
+        ? `${API_BASE_URL}/api/auth/login`
+        : `${API_BASE_URL}/api/auth/signup`;
 
       const body = isLogin
         ? {
-            email: formData.email,
+            email: cleanEmail,
             password: formData.password,
           }
         : {
-            name: formData.name,
-            email: formData.email,
+            name: formData.name.trim(),
+            email: cleanEmail,
             password: formData.password,
             confirmPassword: formData.confirmPassword,
             role: "candidate",
@@ -114,7 +136,16 @@ function Login() {
         throw new Error(data.message || "Authentication failed. Please check your credentials.");
       }
 
-      // Save token and user info
+      // Sync with Appwrite client SDK if available in background
+      try {
+        if (!isLogin) {
+          await account.create(ID.unique(), cleanEmail, formData.password, formData.name.trim());
+        }
+      } catch (appwriteErr) {
+        // Appwrite client sync notice
+      }
+
+      // Save token and user info safely (NEVER save password)
       localStorage.setItem("prepquartersToken", data.token);
       localStorage.setItem("prepquartersUser", JSON.stringify(data.user));
 
@@ -125,6 +156,92 @@ function Login() {
       setMessageType("error");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleForgotSubmit = async (e) => {
+    e.preventDefault();
+    setForgotLoading(true);
+    setForgotMessage("");
+    setForgotMessageType("");
+
+    if (forgotStep === "request") {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/auth/forgot-password`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: forgotEmail.trim().toLowerCase() }),
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          setForgotMessageType("success");
+          setForgotMessage(data.message || "A 6-digit verification code has been sent to your email. Please check your inbox.");
+          setResetTokenInput(""); // Require user to type the code from their email
+          setForgotStep("reset");
+        } else {
+          setForgotMessageType("error");
+          setForgotMessage(data.message || "Could not find an account with this email.");
+        }
+      } catch (err) {
+        setForgotMessageType("error");
+        setForgotMessage("Failed to reach password recovery service.");
+      } finally {
+        setForgotLoading(false);
+      }
+    } else {
+      // Reset step with 6-digit verification code
+      if (!resetTokenInput.trim() || resetTokenInput.trim().length < 6) {
+        setForgotMessageType("error");
+        setForgotMessage("Please enter the complete 6-digit verification code sent to your email.");
+        setForgotLoading(false);
+        return;
+      }
+      if (newPassword.length < 8) {
+        setForgotMessageType("error");
+        setForgotMessage("New password must be at least 8 characters long.");
+        setForgotLoading(false);
+        return;
+      }
+      if (newPassword !== confirmNewPassword) {
+        setForgotMessageType("error");
+        setForgotMessage("Passwords do not match.");
+        setForgotLoading(false);
+        return;
+      }
+
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/auth/reset-password`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: forgotEmail.trim().toLowerCase(),
+            code: resetTokenInput.trim(),
+            newPassword,
+            confirmNewPassword,
+          }),
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          setForgotMessageType("success");
+          setForgotMessage("Password reset successfully. You can now log in with your new password.");
+          setTimeout(() => {
+            setForgotModalOpen(false);
+            setForgotStep("request");
+            setResetTokenInput("");
+            setNewPassword("");
+            setConfirmNewPassword("");
+            setIsLogin(true);
+          }, 1800);
+        } else {
+          setForgotMessageType("error");
+          setForgotMessage(data.message || "Invalid verification code or password criteria not met.");
+        }
+      } catch (err) {
+        setForgotMessageType("error");
+        setForgotMessage("Failed to connect to password reset service.");
+      } finally {
+        setForgotLoading(false);
+      }
     }
   };
 
@@ -247,15 +364,21 @@ function Login() {
               </button>
             </div>
 
-            {/* Notification message */}
+            {/* Notification message (High Contrast in both Dark & Light Themes) */}
             {message && (
               <div
                 className={`auth-message ${
                   messageType === "success" ? "auth-message-success" : "auth-message-error"
                 }`}
                 role="alert"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                }}
               >
-                {message}
+                {messageType === "success" ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
+                <span>{message}</span>
               </div>
             )}
 
@@ -293,45 +416,107 @@ function Login() {
                 />
               </div>
 
-              {/* Password */}
+              {/* Password with Visibility Toggle */}
               <div className="auth-field">
                 <label htmlFor="password">Password</label>
-                <input
-                  id="password"
-                  name="password"
-                  type="password"
-                  placeholder={isLogin ? "Enter your password" : "Minimum 8 characters"}
-                  value={formData.password}
-                  onChange={handleChange}
-                  required
-                  autoComplete={isLogin ? "current-password" : "new-password"}
-                />
+                <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
+                  <input
+                    id="password"
+                    name="password"
+                    type={showPassword ? "text" : "password"}
+                    placeholder={isLogin ? "Enter your password" : "Minimum 8 characters"}
+                    value={formData.password}
+                    onChange={handleChange}
+                    required
+                    autoComplete={isLogin ? "current-password" : "new-password"}
+                    style={{ width: "100%", paddingRight: "44px" }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                    style={{
+                      position: "absolute",
+                      right: "12px",
+                      background: "none",
+                      border: "none",
+                      color: "var(--text-secondary)",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      padding: "4px",
+                    }}
+                  >
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
               </div>
 
-              {/* Confirm Password for Signup */}
+              {/* Confirm Password for Signup with Visibility Toggle */}
               {!isLogin && (
                 <div className="auth-field">
                   <label htmlFor="confirmPassword">Confirm Password</label>
-                  <input
-                    id="confirmPassword"
-                    name="confirmPassword"
-                    type="password"
-                    placeholder="Re-enter your password"
-                    value={formData.confirmPassword}
-                    onChange={handleChange}
-                    required
-                    autoComplete="new-password"
-                  />
+                  <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
+                    <input
+                      id="confirmPassword"
+                      name="confirmPassword"
+                      type={showConfirmPassword ? "text" : "password"}
+                      placeholder="Re-enter your password"
+                      value={formData.confirmPassword}
+                      onChange={handleChange}
+                      required
+                      autoComplete="new-password"
+                      style={{ width: "100%", paddingRight: "44px" }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+                      style={{
+                        position: "absolute",
+                        right: "12px",
+                        background: "none",
+                        border: "none",
+                        color: "var(--text-secondary)",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        padding: "4px",
+                      }}
+                    >
+                      {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
                 </div>
               )}
 
-              {/* Remember Me for Login */}
+              {/* Remember Me & Forgot Password Row */}
               {isLogin && (
-                <div className="forgot-row">
-                  <label className="remember-me">
+                <div className="forgot-row" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", margin: "8px 0 16px" }}>
+                  <label className="remember-me" style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "0.85rem", color: "var(--text-secondary)", cursor: "pointer" }}>
                     <input type="checkbox" defaultChecked />
-                    <span>Remember this device</span>
+                    <span>Remember device</span>
                   </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setForgotModalOpen(true);
+                      setForgotEmail(formData.email);
+                      setForgotMessage("");
+                    }}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      color: "var(--accent-primary)",
+                      fontSize: "0.85rem",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                    }}
+                  >
+                    Forgot password?
+                  </button>
                 </div>
               )}
 
@@ -352,6 +537,212 @@ function Login() {
           </div>
         </section>
       </div>
+
+      {/* =========================================================
+          FORGOT PASSWORD MODAL
+      ========================================================= */}
+      {forgotModalOpen && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 10000,
+            background: "rgba(0, 0, 0, 0.6)",
+            backdropFilter: "blur(6px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "20px",
+          }}
+        >
+          <div
+            style={{
+              width: "100%",
+              maxWidth: "440px",
+              background: "var(--bg-card)",
+              border: "1px solid var(--border-glass)",
+              borderRadius: "16px",
+              padding: "28px",
+              boxShadow: "var(--shadow-dropdown)",
+              position: "relative",
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => setForgotModalOpen(false)}
+              aria-label="Close dialog"
+              style={{
+                position: "absolute",
+                top: "16px",
+                right: "16px",
+                background: "none",
+                border: "none",
+                color: "var(--text-secondary)",
+                cursor: "pointer",
+              }}
+            >
+              <X size={20} />
+            </button>
+
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "12px" }}>
+              <div style={{ width: "36px", height: "36px", borderRadius: "10px", background: "var(--accent-soft)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--accent-primary)" }}>
+                <KeyRound size={20} />
+              </div>
+              <h3 style={{ fontSize: "1.2rem", fontWeight: 700, margin: 0, color: "var(--text-primary)" }}>
+                {forgotStep === "request" ? "Recover Password" : "Reset Password"}
+              </h3>
+            </div>
+
+            <p style={{ fontSize: "0.88rem", color: "var(--text-secondary)", marginBottom: "18px", lineHeight: 1.5 }}>
+              {forgotStep === "request"
+                ? "Enter your account email. We will send a secure 6-digit verification code to your inbox."
+                : `Enter the 6-digit verification code sent to ${forgotEmail} to authorize your new password.`}
+            </p>
+
+            {forgotMessage && (
+              <div
+                style={{
+                  padding: "10px 14px",
+                  borderRadius: "8px",
+                  fontSize: "0.85rem",
+                  marginBottom: "16px",
+                  background: forgotMessageType === "success" ? "var(--accent-soft)" : "rgba(239, 68, 68, 0.12)",
+                  color: forgotMessageType === "success" ? "var(--accent-primary)" : "#b91c1c",
+                  border: forgotMessageType === "success" ? "1px solid var(--accent-border)" : "1px solid rgba(239, 68, 68, 0.35)",
+                  fontWeight: 600,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                }}
+              >
+                {forgotMessageType === "success" ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
+                <span>{forgotMessage}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleForgotSubmit} style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+              {forgotStep === "request" ? (
+                <div>
+                  <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, color: "var(--text-primary)", marginBottom: "6px" }}>
+                    Account Email
+                  </label>
+                  <input
+                    type="email"
+                    placeholder="candidate@example.com"
+                    value={forgotEmail}
+                    onChange={(e) => setForgotEmail(e.target.value)}
+                    required
+                    style={{
+                      width: "100%",
+                      padding: "10px 14px",
+                      borderRadius: "8px",
+                      background: "var(--bg-input)",
+                      border: "1px solid var(--border-medium)",
+                      color: "var(--text-primary)",
+                      fontSize: "0.92rem",
+                      boxSizing: "border-box",
+                    }}
+                  />
+                </div>
+              ) : (
+                <>
+                  <div>
+                    <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, color: "var(--text-primary)", marginBottom: "6px" }}>
+                      6-Digit Verification Code
+                    </label>
+                    <input
+                      type="text"
+                      maxLength={6}
+                      placeholder="123456"
+                      value={resetTokenInput}
+                      onChange={(e) => setResetTokenInput(e.target.value.replace(/\D/g, ""))}
+                      required
+                      style={{
+                        width: "100%",
+                        padding: "12px 14px",
+                        borderRadius: "8px",
+                        background: "var(--bg-input)",
+                        border: "1px solid var(--border-medium)",
+                        color: "var(--accent-primary)",
+                        fontSize: "1.2rem",
+                        fontWeight: "700",
+                        letterSpacing: "6px",
+                        textAlign: "center",
+                        boxSizing: "border-box",
+                        fontFamily: "var(--font-mono)",
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, color: "var(--text-primary)", marginBottom: "6px" }}>
+                      New Password
+                    </label>
+                    <input
+                      type="password"
+                      placeholder="Minimum 8 characters"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      required
+                      style={{
+                        width: "100%",
+                        padding: "10px 14px",
+                        borderRadius: "8px",
+                        background: "var(--bg-input)",
+                        border: "1px solid var(--border-medium)",
+                        color: "var(--text-primary)",
+                        fontSize: "0.92rem",
+                        boxSizing: "border-box",
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, color: "var(--text-primary)", marginBottom: "6px" }}>
+                      Confirm New Password
+                    </label>
+                    <input
+                      type="password"
+                      placeholder="Re-enter new password"
+                      value={confirmNewPassword}
+                      onChange={(e) => setConfirmNewPassword(e.target.value)}
+                      required
+                      style={{
+                        width: "100%",
+                        padding: "10px 14px",
+                        borderRadius: "8px",
+                        background: "var(--bg-input)",
+                        border: "1px solid var(--border-medium)",
+                        color: "var(--text-primary)",
+                        fontSize: "0.92rem",
+                        boxSizing: "border-box",
+                      }}
+                    />
+                  </div>
+                </>
+              )}
+
+              <button
+                type="submit"
+                disabled={forgotLoading}
+                style={{
+                  padding: "12px 18px",
+                  borderRadius: "8px",
+                  background: "var(--accent-primary)",
+                  color: "#ffffff",
+                  fontWeight: 700,
+                  fontSize: "0.92rem",
+                  border: "none",
+                  cursor: forgotLoading ? "not-allowed" : "pointer",
+                  marginTop: "6px",
+                }}
+              >
+                {forgotLoading ? "Processing..." : forgotStep === "request" ? "Send 6-Digit Code" : "Verify Code & Reset Password"}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

@@ -1,26 +1,20 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
-  Sparkles,
-  Bot,
-  Award,
   BookOpen,
-  TrendingUp,
+  Award,
   Clock,
-  CheckCircle2,
-  AlertCircle,
-  Building,
-  Sliders,
-  RotateCcw,
   ArrowRight,
   FileText,
   Zap,
   Target,
   BarChart2,
   Calendar,
-  Activity,
   Layers,
+  CheckCircle2,
+  TrendingUp,
 } from "lucide-react";
+import { API_BASE_URL } from "../config/api";
 import "./Dashboard.css";
 
 function Dashboard() {
@@ -29,13 +23,11 @@ function Dashboard() {
   const [stats, setStats] = useState({
     totalInterviews: 0,
     completedInterviews: 0,
-    totalQuestionsAnswered: 0,
-    totalPracticeTimeMinutes: 0,
     averageScore: 0,
-    highestScore: 0,
-    skills: [],
+    lastPracticedAt: null,
   });
   const [recentSessions, setRecentSessions] = useState([]);
+  const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -63,428 +55,314 @@ function Dashboard() {
     setError("");
 
     try {
-      // 1. Fetch aggregate statistics
-      const statsRes = await fetch("https://prepquarters-backend.onrender.com/api/interview/stats/summary", {
+      // 1. Fetch user sessions
+      const sessionsRes = await fetch(`${API_BASE_URL}/api/interview/user/sessions`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
 
-      if (statsRes.ok) {
-        const statsData = await statsRes.json();
-        if (statsData.success && statsData.stats) {
-          setStats(statsData.stats);
+      if (sessionsRes.ok) {
+        const data = await sessionsRes.json();
+        if (data.success && Array.isArray(data.sessions)) {
+          setRecentSessions(data.sessions);
+
+          const completed = data.sessions.filter((s) => s.status === "completed");
+          const scores = completed.map((s) => s.overallEvaluation?.overallScore || 0);
+          const avg = scores.length > 0 ? Math.round((scores.reduce((a, b) => a + b, 0) / scores.length) * 10) / 10 : 0;
+
+          setStats({
+            totalInterviews: data.sessions.length,
+            completedInterviews: completed.length,
+            averageScore: avg,
+            lastPracticedAt: data.sessions[0]?.createdAt || null,
+          });
         }
       }
 
-      // 2. Fetch session history
-      const historyRes = await fetch("https://prepquarters-backend.onrender.com/api/interview/history/all", {
+      // 2. Fetch skill gap analytics
+      const analyticsRes = await fetch(`${API_BASE_URL}/api/interview/user/skill-gap-analytics`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
 
-      if (historyRes.ok) {
-        const historyData = await historyRes.json();
-        if (historyData.success && Array.isArray(historyData.sessions)) {
-          setRecentSessions(historyData.sessions);
+      if (analyticsRes.ok) {
+        const analyticsData = await analyticsRes.json();
+        if (analyticsData.success) {
+          setAnalytics(analyticsData.analytics);
         }
       }
     } catch (err) {
       console.error("Dashboard load error:", err);
-      setError("Failed to sync telemetry data. Please verify backend connection.");
+      setError("Failed to sync session history. Please verify backend connection.");
     } finally {
       setLoading(false);
     }
   };
 
-  const getReadinessTier = (avgScore) => {
-    if (avgScore >= 85) return { label: "Exceptional Readiness", color: "var(--emerald-core)" };
-    if (avgScore >= 70) return { label: "Proficient", color: "var(--cyan-bright)" };
-    if (avgScore >= 50) return { label: "Developing Baseline", color: "var(--amber-core)" };
-    return { label: "Initial Assessment", color: "var(--text-muted)" };
-  };
-
-  const readiness = getReadinessTier(stats.averageScore || 0);
-
   return (
-    <main className="dashboard-page bg-grid-cyber">
-      <div className="dashboard-main">
-        {/* 1. Command Center Telemetry Header */}
-        <section className="dashboard-welcome">
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "16px" }}>
-            <div>
-              <p className="dashboard-eyebrow">
-                <span className="pulse-dot cyan" />
-                <span>CANDIDATE COMMAND CENTER // TELEMETRY ACTIVE</span>
-              </p>
-              <h1>Welcome back, {user?.name || "Candidate"}</h1>
-              <p className="dashboard-description">
-                Your AI interview telemetry is synchronized. Review performance trends, analyze
-                domain competency gaps, or launch a new adaptive mock session.
-              </p>
+    <main className="dashboard-page" style={{ padding: "30px 20px 80px", maxWidth: "1160px", margin: "0 auto" }}>
+      {/* 1. Welcome & Primary Quick Actions */}
+      <section style={{ marginBottom: "32px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "20px", marginBottom: "24px" }}>
+          <div>
+            <div style={{ display: "inline-flex", alignItems: "center", gap: "6px", color: "var(--accent-primary)", fontSize: "0.82rem", fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: "6px" }}>
+              <Zap size={14} />
+              <span>Candidate Dashboard</span>
             </div>
+            <h1 style={{ fontSize: "2.2rem", fontWeight: 800, margin: "0 0 8px", color: "var(--text-primary)" }}>
+              Welcome back, {user?.name || "Candidate"}
+            </h1>
+            <p style={{ color: "var(--text-secondary)", fontSize: "0.98rem", margin: 0, maxWidth: "680px", lineHeight: 1.5 }}>
+              Track your interview performance, review past evaluation feedback, or start a new targeted mock session.
+            </p>
+          </div>
 
-            <div
+          {/* Quick Primary Practice Launch Button */}
+          <button
+            type="button"
+            onClick={() => navigate("/practice/ai-interview/setup")}
+            style={{
+              background: "var(--accent-primary)",
+              color: "#ffffff",
+              border: "none",
+              borderRadius: "10px",
+              padding: "12px 24px",
+              fontSize: "0.95rem",
+              fontWeight: 700,
+              cursor: "pointer",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "8px",
+              boxShadow: "0 4px 18px var(--accent-glow)",
+            }}
+          >
+            <span>Start Practice Session</span>
+            <ArrowRight size={16} />
+          </button>
+        </div>
+
+        {/* Quick Hub Navigation Cards */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "16px" }}>
+          <div
+            onClick={() => navigate("/practice/ai-interview/setup")}
+            style={{
+              background: "var(--bg-card)",
+              border: "1px solid var(--border-subtle)",
+              borderRadius: "12px",
+              padding: "20px",
+              cursor: "pointer",
+              boxShadow: "var(--shadow-glass)",
+              transition: "all 0.15s ease",
+            }}
+          >
+            <div style={{ width: "38px", height: "38px", borderRadius: "8px", background: "var(--accent-soft)", color: "var(--accent-primary)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "12px" }}>
+              <Layers size={20} />
+            </div>
+            <h3 style={{ fontSize: "1.1rem", fontWeight: 700, color: "var(--text-primary)", margin: "0 0 4px" }}>Interview Practice</h3>
+            <p style={{ fontSize: "0.85rem", color: "var(--text-secondary)", margin: 0 }}>Configure roles, modalities, and start live mock sessions.</p>
+          </div>
+
+          <div
+            onClick={() => navigate("/practice/question-library")}
+            style={{
+              background: "var(--bg-card)",
+              border: "1px solid var(--border-subtle)",
+              borderRadius: "12px",
+              padding: "20px",
+              cursor: "pointer",
+              boxShadow: "var(--shadow-glass)",
+              transition: "all 0.15s ease",
+            }}
+          >
+            <div style={{ width: "38px", height: "38px", borderRadius: "8px", background: "rgba(56, 189, 248, 0.12)", color: "var(--accent-cyan)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "12px" }}>
+              <BookOpen size={20} />
+            </div>
+            <h3 style={{ fontSize: "1.1rem", fontWeight: 700, color: "var(--text-primary)", margin: "0 0 4px" }}>Question Bank</h3>
+            <p style={{ fontSize: "0.85rem", color: "var(--text-secondary)", margin: 0 }}>Browse 200+ Codeforces and curated technical challenges.</p>
+          </div>
+
+          <div
+            onClick={() => navigate("/resume-analyzer")}
+            style={{
+              background: "var(--bg-card)",
+              border: "1px solid var(--border-subtle)",
+              borderRadius: "12px",
+              padding: "20px",
+              cursor: "pointer",
+              boxShadow: "var(--shadow-glass)",
+              transition: "all 0.15s ease",
+            }}
+          >
+            <div style={{ width: "38px", height: "38px", borderRadius: "8px", background: "rgba(251, 191, 36, 0.12)", color: "var(--accent-amber)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "12px" }}>
+              <FileText size={20} />
+            </div>
+            <h3 style={{ fontSize: "1.1rem", fontWeight: 700, color: "var(--text-primary)", margin: "0 0 4px" }}>Resume Tailoring</h3>
+            <p style={{ fontSize: "0.85rem", color: "var(--text-secondary)", margin: 0 }}>Upload PDF for suggestions or build compile-ready LaTeX.</p>
+          </div>
+        </div>
+      </section>
+
+      {/* 2. Key Metrics Strip */}
+      <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "16px", marginBottom: "32px" }}>
+        <div style={{ background: "var(--bg-card)", border: "1px solid var(--border-subtle)", borderRadius: "12px", padding: "20px", boxShadow: "var(--shadow-glass)" }}>
+          <span style={{ fontSize: "0.78rem", fontWeight: 600, color: "var(--text-secondary)", textTransform: "uppercase" }}>Completed Sessions</span>
+          <div style={{ fontSize: "2rem", fontWeight: 800, color: "var(--text-primary)", margin: "4px 0" }}>{stats.completedInterviews}</div>
+          <span style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>{stats.totalInterviews} total initiated</span>
+        </div>
+
+        <div style={{ background: "var(--bg-card)", border: "1px solid var(--border-subtle)", borderRadius: "12px", padding: "20px", boxShadow: "var(--shadow-glass)" }}>
+          <span style={{ fontSize: "0.78rem", fontWeight: 600, color: "var(--text-secondary)", textTransform: "uppercase" }}>Average Score</span>
+          <div style={{ fontSize: "2rem", fontWeight: 800, color: "var(--accent-primary)", margin: "4px 0" }}>{stats.averageScore} / 10</div>
+          <span style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>Evidence-based rubric rating</span>
+        </div>
+
+        <div style={{ background: "var(--bg-card)", border: "1px solid var(--border-subtle)", borderRadius: "12px", padding: "20px", boxShadow: "var(--shadow-glass)" }}>
+          <span style={{ fontSize: "0.78rem", fontWeight: 600, color: "var(--text-secondary)", textTransform: "uppercase" }}>Target Role</span>
+          <div style={{ fontSize: "1.2rem", fontWeight: 700, color: "var(--text-primary)", margin: "8px 0 4px" }}>{user?.targetRole || "Software Engineer"}</div>
+          <span style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>{user?.targetDomain || "Software Engineering"}</span>
+        </div>
+      </section>
+
+      {/* 3. Recent Sessions (Latest 2 Completed Retained) */}
+      <section style={{ marginBottom: "32px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+          <div>
+            <h2 style={{ fontSize: "1.3rem", fontWeight: 700, color: "var(--text-primary)", margin: 0 }}>
+              Recent Practice History
+            </h2>
+            <p style={{ fontSize: "0.85rem", color: "var(--text-secondary)", margin: "2px 0 0" }}>
+              Latest completed session replays with full questions and evaluations.
+            </p>
+          </div>
+        </div>
+
+        {recentSessions.length === 0 ? (
+          <div style={{ background: "var(--bg-card)", border: "1px solid var(--border-subtle)", borderRadius: "12px", padding: "36px", textAlign: "center", boxShadow: "var(--shadow-glass)" }}>
+            <p style={{ color: "var(--text-secondary)", fontSize: "0.95rem", margin: "0 0 16px" }}>
+              No mock sessions completed yet. Start your first session to calibrate your readiness.
+            </p>
+            <button
+              type="button"
+              onClick={() => navigate("/practice/ai-interview/setup")}
               style={{
-                padding: "12px 20px",
-                borderRadius: "14px",
-                background: "rgba(6, 182, 212, 0.08)",
-                border: "1px solid rgba(6, 182, 212, 0.25)",
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
+                background: "var(--accent-primary)",
+                color: "#ffffff",
+                border: "none",
+                borderRadius: "8px",
+                padding: "10px 20px",
+                fontWeight: 600,
+                cursor: "pointer",
               }}
             >
-              <span style={{ fontFamily: "var(--font-mono)", fontSize: "11px", color: "var(--text-muted)", textTransform: "uppercase" }}>
-                Interview Readiness Index
-              </span>
-              <span style={{ fontFamily: "var(--font-heading)", fontSize: "24px", fontWeight: "800", color: readiness.color }}>
-                {stats.averageScore || 0}%
-              </span>
-              <span style={{ fontFamily: "var(--font-mono)", fontSize: "11px", fontWeight: "700", color: readiness.color }}>
-                {readiness.label}
-              </span>
-            </div>
-          </div>
-
-          <div className="dashboard-cta-row">
-            <button
-              type="button"
-              className="dashboard-primary-btn"
-              onClick={() => navigate("/practice/ai-interview/setup")}
-            >
-              <Zap size={16} aria-hidden="true" />
-              <span>Launch Mock Interview Cockpit</span>
-            </button>
-
-            <button
-              type="button"
-              className="dashboard-secondary-btn"
-              onClick={() => navigate("/practice/question-library")}
-            >
-              <BookOpen size={16} aria-hidden="true" />
-              <span>Browse Question Bank</span>
-            </button>
-
-            <button
-              type="button"
-              className="dashboard-secondary-btn"
-              onClick={() => navigate("/practice/progress")}
-            >
-              <Activity size={16} aria-hidden="true" />
-              <span>View Diagnostic Radar</span>
-            </button>
-
-            <button
-              type="button"
-              className="dashboard-secondary-btn"
-              onClick={() => navigate("/docs")}
-            >
-              <FileText size={16} aria-hidden="true" />
-              <span>System Docs</span>
+              Start First Mock Session
             </button>
           </div>
-        </section>
-
-        {error && (
-          <div className="session-error-banner" role="alert">
-            <AlertCircle size={18} aria-hidden="true" />
-            <span>{error}</span>
-          </div>
-        )}
-
-        {/* 2. Primary Choice: 10 Interview Modality Command Center */}
-        <section style={{ marginBottom: "32px" }}>
-          <div className="dashboard-subheading" style={{ marginBottom: "16px" }}>
-            <div>
-              <h3>Select Interview Modality</h3>
-              <p>Calibrate autonomous AI questioning with specialized cockpits and rubrics.</p>
-            </div>
-          </div>
-
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "14px" }}>
-            {[
-              { name: "AI Voice Interview", badge: "VOICE", desc: "Live conversational voice mock with Web Audio spectrum and Groq STT." },
-              { name: "Technical Interview", badge: "CONCEPTS", desc: "Computer science fundamentals, distributed systems, and protocols." },
-              { name: "Coding Interview", badge: "ALGORITHMS", desc: "Interactive editor with runtime sandbox and test assertions." },
-              { name: "AI Coding Interview", badge: "PROBING", desc: "Conversational interviewer asking design approach and edge cases." },
-              { name: "System Design Interview", badge: "SCALE", desc: "Distributed architectures, sharding, and regional failovers." },
-              { name: "HR / Behavioral Interview", badge: "STAR", desc: "Leadership scenarios, conflict resolution, and ownership." },
-              { name: "Aptitude Interview", badge: "REASONING", desc: "Quantitative aptitude, syllogisms, and speed derivations." },
-              { name: "Language-Specific Technical Interview", badge: "RUNTIME", desc: "V8 Event Loop, Python GIL, JVM threads, and SQL plans." },
-              { name: "Company-Specific Interview", badge: "BENCHMARK", desc: "Calibrated rubrics for Google, Meta, Amazon, and Stripe." },
-              { name: "Mixed Interview", badge: "HYBRID", desc: "Full round blending technical, algorithmic, and situational questions." },
-            ].map((m) => (
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+            {recentSessions.slice(0, 5).map((s) => (
               <div
-                key={m.name}
+                key={s._id || s.id}
                 style={{
-                  padding: "16px",
-                  borderRadius: "12px",
-                  background: "var(--bg-surface-2)",
+                  background: "var(--bg-card)",
                   border: "1px solid var(--border-subtle)",
+                  borderRadius: "12px",
+                  padding: "18px 24px",
                   display: "flex",
-                  flexDirection: "column",
                   justifyContent: "space-between",
-                  transition: "all 0.15s ease",
+                  alignItems: "center",
+                  flexWrap: "wrap",
+                  gap: "14px",
+                  boxShadow: "var(--shadow-glass)",
                 }}
               >
                 <div>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-                    <span className="stat-badge" style={{ margin: 0 }}>{m.badge}</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "4px" }}>
+                    <strong style={{ fontSize: "1.05rem", color: "var(--text-primary)" }}>
+                      {s.interviewType || s.modality || "Technical Interview"}
+                    </strong>
+                    <span style={{ fontSize: "0.75rem", background: "var(--accent-soft)", color: "var(--accent-primary)", padding: "2px 8px", borderRadius: "6px", fontWeight: 700 }}>
+                      {s.difficulty || "Hard"}
+                    </span>
+                    <span style={{ fontSize: "0.75rem", background: "var(--bg-secondary)", color: "var(--text-secondary)", padding: "2px 8px", borderRadius: "6px" }}>
+                      {s.role || "Software Engineer"}
+                    </span>
                   </div>
-                  <strong style={{ fontSize: "14px", color: "var(--text-primary)", display: "block", marginBottom: "4px" }}>
-                    {m.name}
-                  </strong>
-                  <p style={{ fontSize: "12px", color: "var(--text-secondary)", lineHeight: "1.4", margin: "0 0 12px 0" }}>
-                    {m.desc}
-                  </p>
+                  <span style={{ fontSize: "0.82rem", color: "var(--text-muted)" }}>
+                    {new Date(s.createdAt).toLocaleDateString()} &bull; {s.questions?.length || 0} questions evaluated
+                  </span>
                 </div>
-                <button
-                  type="button"
-                  className="dashboard-primary-btn"
-                  style={{ width: "100%", padding: "6px 12px", fontSize: "12px", justifyContent: "center" }}
-                  onClick={() =>
-                    navigate("/practice/ai-interview/setup", {
-                      state: { prefillInterviewType: m.name },
-                    })
-                  }
-                >
-                  <span>Configure {m.badge}</span>
-                  <ArrowRight size={12} aria-hidden="true" />
-                </button>
+
+                <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+                  {s.overallEvaluation?.overallScore ? (
+                    <div style={{ textAlign: "right" }}>
+                      <span style={{ fontSize: "0.75rem", color: "var(--text-secondary)", display: "block" }}>Overall Score</span>
+                      <strong style={{ fontSize: "1.2rem", color: "var(--accent-primary)" }}>{s.overallEvaluation.overallScore} / 10</strong>
+                    </div>
+                  ) : null}
+
+                  <button
+                    type="button"
+                    onClick={() => navigate("/practice/ai-interview/session", {
+                      state: {
+                        sessionId: s._id || s.id,
+                        session: s,
+                        initialQuestion: s.questions ? s.questions[0] : null,
+                      },
+                    })}
+                    style={{
+                      background: "var(--bg-secondary)",
+                      border: "1px solid var(--border-medium)",
+                      color: "var(--text-primary)",
+                      padding: "8px 16px",
+                      borderRadius: "8px",
+                      fontSize: "0.88rem",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                    }}
+                  >
+                    View Replay
+                  </button>
+                </div>
               </div>
             ))}
           </div>
-        </section>
+        )}
+      </section>
 
-        {/* 2. Telemetry Statistics Counters */}
-        <section className="dashboard-stats" aria-label="Key Performance Indicators">
-          <div className="dashboard-stat-card">
-            <div className="stat-card-top">
-              <div className="dashboard-stat-icon">
-                <Target size={20} aria-hidden="true" />
-              </div>
-              <span className="stat-badge">SESSIONS</span>
-            </div>
-            <div className="dashboard-stat-number">{stats.completedInterviews}</div>
-            <div className="dashboard-stat-label">
-              Completed Mock Sessions ({stats.totalInterviews} initiated)
-            </div>
-          </div>
+      {/* 4. Diagnostic Strengths & Weaknesses (If Data Exists) */}
+      {analytics && analytics.hasData && (
+        <section style={{ background: "var(--bg-card)", border: "1px solid var(--border-subtle)", borderRadius: "14px", padding: "24px", boxShadow: "var(--shadow-glass)" }}>
+          <h2 style={{ fontSize: "1.2rem", fontWeight: 700, color: "var(--text-primary)", margin: "0 0 16px" }}>
+            Diagnostic Skill Observations
+          </h2>
 
-          <div className="dashboard-stat-card">
-            <div className="stat-card-top">
-              <div className="dashboard-stat-icon">
-                <BookOpen size={20} aria-hidden="true" />
-              </div>
-              <span className="stat-badge">QUESTIONS</span>
-            </div>
-            <div className="dashboard-stat-number">{stats.totalQuestionsAnswered}</div>
-            <div className="dashboard-stat-label">Evaluated with Rubric Feedback</div>
-          </div>
-
-          <div className="dashboard-stat-card">
-            <div className="stat-card-top">
-              <div className="dashboard-stat-icon">
-                <Award size={20} aria-hidden="true" />
-              </div>
-              <span className="stat-badge">PEAK SCORE</span>
-            </div>
-            <div className="dashboard-stat-number">{stats.highestScore}%</div>
-            <div className="dashboard-stat-label">
-              Highest Evaluation Score (Avg: {stats.averageScore}%)
-            </div>
-          </div>
-
-          <div className="dashboard-stat-card">
-            <div className="stat-card-top">
-              <div className="dashboard-stat-icon">
-                <Clock size={20} aria-hidden="true" />
-              </div>
-              <span className="stat-badge">PRACTICE TIME</span>
-            </div>
-            <div className="dashboard-stat-number">{stats.totalPracticeTimeMinutes}m</div>
-            <div className="dashboard-stat-label">Total Time in Live AI Cockpit</div>
-          </div>
-        </section>
-
-        {/* 3. Main Split Grid: Session History & Competency Matrix */}
-        <section className="dashboard-grid-layout">
-          {/* Left Column: Recent Mock Sessions Feed */}
-          <div className="dashboard-sessions-panel">
-            <div className="dashboard-subheading">
-              <div>
-                <h3>Recent Interview Telemetry</h3>
-                <p>Track multi-turn evaluations, scores, and replay transcripts.</p>
-              </div>
-              {recentSessions.length > 0 && (
-                <span className="view-all-link">
-                  {recentSessions.length} Total Sessions
-                </span>
-              )}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
+            <div>
+              <span style={{ fontSize: "0.82rem", fontWeight: 700, color: "var(--accent-primary)", textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: "8px" }}>
+                Identified Strengths
+              </span>
+              <ul style={{ paddingLeft: "18px", margin: 0, color: "var(--text-primary)", fontSize: "0.9rem", lineHeight: 1.6 }}>
+                {analytics.strengths?.map((str, idx) => (
+                  <li key={idx}>{str}</li>
+                ))}
+              </ul>
             </div>
 
-            {loading ? (
-              <div className="dashboard-loading-card">
-                <span>Synchronizing session telemetry...</span>
-              </div>
-            ) : recentSessions.length === 0 ? (
-              <div className="dashboard-empty-card">
-                <Bot size={36} aria-hidden="true" style={{ color: "var(--cyan-bright)", marginBottom: "12px" }} />
-                <h4>No Interview Sessions Recorded</h4>
-                <p>Launch your first mock interview cockpit to test your technical reasoning.</p>
-                <button
-                  type="button"
-                  className="dashboard-primary-btn"
-                  style={{ marginTop: "16px" }}
-                  onClick={() => navigate("/practice/ai-interview/setup")}
-                >
-                  Start First Mock Session
-                </button>
-              </div>
-            ) : (
-              recentSessions.slice(0, 5).map((s) => {
-                const score = s.overallEvaluation?.overallScore;
-                const dateStr = new Date(s.createdAt).toLocaleDateString(undefined, {
-                  month: "short",
-                  day: "numeric",
-                });
-
-                return (
-                  <article className="session-card" key={s._id}>
-                    <div className="session-card-header">
-                      <div className="session-role-info">
-                        <h4>{s.role}</h4>
-                        <div className="session-tags">
-                          <span className="tag-domain">{s.domain}</span>
-                          <span className={`tag-difficulty ${s.difficulty.toLowerCase()}`}>
-                            {s.difficulty}
-                          </span>
-                          <span className="tag-company">
-                            <Building size={11} aria-hidden="true" />
-                            {s.companyStyle}
-                          </span>
-                        </div>
-                      </div>
-
-                      {typeof score === "number" ? (
-                        <div className="session-score-pill">
-                          <span className="score-val">{score}%</span>
-                          <span className="score-label">Score</span>
-                        </div>
-                      ) : (
-                        <span className="luminous-badge amber">In Progress</span>
-                      )}
-                    </div>
-
-                    <div className="session-card-footer">
-                      <div className="session-meta">
-                        <Calendar size={13} aria-hidden="true" />
-                        <span>{dateStr}</span>
-                        <span>-</span>
-                        <span>{s.questions?.length || 0} Questions Evaluated</span>
-                      </div>
-
-                      {s.status === "in_progress" ? (
-                        <button
-                          type="button"
-                          className="dashboard-primary-btn"
-                          style={{ padding: "6px 14px", fontSize: "12px" }}
-                          onClick={() =>
-                            navigate("/practice/ai-interview", {
-                              state: { sessionId: s._id },
-                            })
-                          }
-                        >
-                          <Zap size={13} aria-hidden="true" />
-                          <span>Resume Cockpit</span>
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          className="replay-btn"
-                          onClick={() => navigate(`/practice/replay/${s._id}`)}
-                        >
-                          <RotateCcw size={13} aria-hidden="true" />
-                          <span>Transcript Replay</span>
-                        </button>
-                      )}
-                    </div>
-                  </article>
-                );
-              })
-            )}
-          </div>
-
-          {/* Right Column: Competency Radar & Actionable Remediation */}
-          <div className="dashboard-competency-panel">
-            <div className="dashboard-subheading">
-              <div>
-                <h3>Competency Matrix</h3>
-                <p>Aggregated technical depth scores across domain categories.</p>
-              </div>
-            </div>
-
-            <div className="skills-overview-card">
-              {stats.skills && stats.skills.length > 0 ? (
-                <div className="skills-meter-list">
-                  {stats.skills.slice(0, 5).map((skill, idx) => (
-                    <div className="skill-meter-item" key={idx}>
-                      <div className="skill-meter-header">
-                        <span className="skill-name">{skill.skillName}</span>
-                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                          <span style={{ fontFamily: "var(--font-mono)", fontSize: "12px", color: "var(--cyan-bright)" }}>
-                            {skill.averageScore}%
-                          </span>
-                          <span
-                            className={`skill-status-tag ${skill.status
-                              .toLowerCase()
-                              .replace(/\s+/g, "-")}`}
-                          >
-                            {skill.status}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="skill-progress-bar">
-                        <div
-                          className="skill-progress-fill"
-                          style={{ width: `${Math.min(100, Math.max(10, skill.averageScore))}%` }}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div style={{ padding: "20px 0", textAlign: "center", color: "var(--text-muted)", fontSize: "13px" }}>
-                  Complete mock interviews to generate your domain competency breakdown.
-                </div>
-              )}
-
-              {/* Actionable Weakness Remediation */}
-              <div className="quick-recommendation-box">
-                <div className="rec-header">
-                  <TrendingUp size={15} aria-hidden="true" />
-                  <span>Targeted Practice Recommendation</span>
-                </div>
-                <p>
-                  Elevate your concurrency and trade-off articulation by running a Hard Mode mock
-                  session focused on distributed system architectures.
-                </p>
-                <button
-                  type="button"
-                  className="rec-action-btn"
-                  onClick={() => navigate("/practice/ai-interview/setup")}
-                >
-                  <span>Launch Hard Mode Practice</span>
-                  <ArrowRight size={13} aria-hidden="true" />
-                </button>
-              </div>
+            <div>
+              <span style={{ fontSize: "0.82rem", fontWeight: 700, color: "var(--accent-amber)", textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: "8px" }}>
+                Recommended Improvement Areas
+              </span>
+              <ul style={{ paddingLeft: "18px", margin: 0, color: "var(--text-primary)", fontSize: "0.9rem", lineHeight: 1.6 }}>
+                {analytics.weaknesses?.map((w, idx) => (
+                  <li key={idx}>{w}</li>
+                ))}
+              </ul>
             </div>
           </div>
         </section>
-      </div>
+      )}
     </main>
   );
 }

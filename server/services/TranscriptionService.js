@@ -5,14 +5,16 @@
  * OpenAI Whisper, and Deepgram Nova-2.
  */
 
+const { cleanDisallowedChars } = require("./SanitizationHelper");
+
 /**
  * Transcribes an audio buffer into text using the configured speech-to-text provider.
  * 
  * @param {Object} options
  * @param {Buffer} options.buffer Audio file buffer
- * @param {string} options.mimetype MIME type (e.g. 'audio/webm', 'audio/wav')
+ * @param {string} options.mimetype MIME type (e.g. 'audio/webm', 'audio/wav', 'audio/mp4')
  * @param {string} options.filename Original filename
- * @returns {Promise<{ success: boolean, transcript: string, provider: string, durationMs?: number, message?: string }>}
+ * @returns {Promise<{ success: boolean, transcript: string, provider: string, latencyMs?: number, message?: string }>}
  */
 async function transcribeAudio({ buffer, mimetype = "audio/webm", filename = "recording.webm" }) {
   if (!buffer || buffer.length === 0) {
@@ -21,12 +23,15 @@ async function transcribeAudio({ buffer, mimetype = "audio/webm", filename = "re
       success: false,
       transcript: "",
       provider: "none",
-      message: "Empty audio buffer received.",
+      latencyMs: 0,
+      message: "Empty audio buffer received. Please speak for at least 1-2 seconds.",
     };
   }
 
   // 1. Groq Whisper (Ultra-fast cloud Whisper large-v3)
   const groqKey = (process.env.GROQ_API_KEY || "").trim();
+  let lastProviderError = "";
+
   if (groqKey) {
     try {
       console.info(`[STT_REQUEST_SENT] Dispatching audio to Groq Whisper (${buffer.length} bytes, ${mimetype})...`);
@@ -40,17 +45,19 @@ async function transcribeAudio({ buffer, mimetype = "audio/webm", filename = "re
           success: true,
           transcript: cleanDisallowedChars(result.transcript),
           provider: "Groq Whisper (whisper-large-v3)",
-          durationMs: elapsedMs,
+          latencyMs: elapsedMs,
         };
       } else {
-        console.warn(`[STT_ERROR] Groq Whisper response error:`, result.message);
+        lastProviderError = result.message || "Groq Whisper returned empty transcript.";
+        console.warn(`[STT_ERROR] Groq Whisper response error:`, lastProviderError);
       }
     } catch (err) {
-      console.warn("[STT_ERROR] Groq Whisper request error:", err.message);
+      lastProviderError = err.message || "Network error contacting Groq Whisper.";
+      console.warn("[STT_ERROR] Groq Whisper request error:", lastProviderError);
     }
   }
 
-  // 2. OpenAI Whisper
+  // 2. OpenAI Whisper Fallback
   const openaiKey = (process.env.OPENAI_API_KEY || "").trim();
   if (openaiKey) {
     try {
@@ -65,17 +72,19 @@ async function transcribeAudio({ buffer, mimetype = "audio/webm", filename = "re
           success: true,
           transcript: cleanDisallowedChars(result.transcript),
           provider: "OpenAI Whisper (whisper-1)",
-          durationMs: elapsedMs,
+          latencyMs: elapsedMs,
         };
       } else {
-        console.warn(`[STT_ERROR] OpenAI Whisper response error:`, result.message);
+        lastProviderError = result.message || "OpenAI Whisper returned empty transcript.";
+        console.warn(`[STT_ERROR] OpenAI Whisper response error:`, lastProviderError);
       }
     } catch (err) {
-      console.warn("[STT_ERROR] OpenAI Whisper request error:", err.message);
+      lastProviderError = err.message || "Network error contacting OpenAI Whisper.";
+      console.warn("[STT_ERROR] OpenAI Whisper request error:", lastProviderError);
     }
   }
 
-  // 3. Deepgram Nova-2
+  // 3. Deepgram Nova-2 Fallback
   const deepgramKey = (process.env.DEEPGRAM_API_KEY || "").trim();
   if (deepgramKey) {
     try {
@@ -90,12 +99,25 @@ async function transcribeAudio({ buffer, mimetype = "audio/webm", filename = "re
           success: true,
           transcript: cleanDisallowedChars(result.transcript),
           provider: "Deepgram Nova-2",
-          durationMs: elapsedMs,
+          latencyMs: elapsedMs,
         };
+      } else {
+        lastProviderError = result.message || "Deepgram returned empty transcript.";
       }
     } catch (err) {
-      console.warn("[STT_ERROR] Deepgram request error:", err.message);
+      lastProviderError = err.message || "Network error contacting Deepgram.";
+      console.warn("[STT_ERROR] Deepgram request error:", lastProviderError);
     }
+  }
+
+  if (groqKey || openaiKey || deepgramKey) {
+    return {
+      success: false,
+      transcript: "",
+      provider: "failed",
+      latencyMs: 0,
+      message: lastProviderError || "Speech transcription service was unable to process the audio. Please try speaking again or use typed input.",
+    };
   }
 
   console.warn("[STT_ERROR] No external STT API key configured in server/.env");
@@ -103,7 +125,8 @@ async function transcribeAudio({ buffer, mimetype = "audio/webm", filename = "re
     success: false,
     transcript: "",
     provider: "none",
-    message: "No external STT API key configured. Please set GROQ_API_KEY in server/.env (free at https://console.groq.com).",
+    latencyMs: 0,
+    message: "No STT API key configured. Please set GROQ_API_KEY in server/.env (free at https://console.groq.com).",
   };
 }
 
@@ -111,11 +134,14 @@ async function transcribeAudio({ buffer, mimetype = "audio/webm", filename = "re
  * Transcribe via Groq Whisper API using native Node fetch and FormData
  */
 async function transcribeWithGroq(buffer, filename, mimetype, apiKey) {
+  const cleanMime = (mimetype || "audio/webm").split(";")[0].trim();
+  const cleanFilename = filename && filename.includes(".") ? filename : "recording.webm";
+
   const formData = new FormData();
   formData.append("model", "whisper-large-v3");
   formData.append("language", "en");
   formData.append("response_format", "json");
-  formData.append("file", new Blob([buffer], { type: mimetype || "audio/webm" }), filename || "recording.webm");
+  formData.append("file", new Blob([buffer], { type: cleanMime }), cleanFilename);
 
   const res = await fetch("https://api.groq.com/openai/v1/audio/transcriptions", {
     method: "POST",
@@ -136,7 +162,7 @@ async function transcribeWithGroq(buffer, filename, mimetype, apiKey) {
     fallbackFormData.append("model", "whisper-large-v3-turbo");
     fallbackFormData.append("language", "en");
     fallbackFormData.append("response_format", "json");
-    fallbackFormData.append("file", new Blob([buffer], { type: mimetype || "audio/webm" }), filename || "recording.webm");
+    fallbackFormData.append("file", new Blob([buffer], { type: cleanMime }), cleanFilename);
 
     const fallbackRes = await fetch("https://api.groq.com/openai/v1/audio/transcriptions", {
       method: "POST",
@@ -154,7 +180,7 @@ async function transcribeWithGroq(buffer, filename, mimetype, apiKey) {
 
   return {
     success: false,
-    message: json.error?.message || `Groq Whisper failed with status ${res.status}`,
+    message: json.error?.message || `Groq Whisper returned status ${res.status}`,
   };
 }
 
@@ -162,11 +188,14 @@ async function transcribeWithGroq(buffer, filename, mimetype, apiKey) {
  * Transcribe via OpenAI Whisper API using native Node fetch and FormData
  */
 async function transcribeWithOpenAI(buffer, filename, mimetype, apiKey) {
+  const cleanMime = (mimetype || "audio/webm").split(";")[0].trim();
+  const cleanFilename = filename && filename.includes(".") ? filename : "recording.webm";
+
   const formData = new FormData();
   formData.append("model", "whisper-1");
   formData.append("language", "en");
   formData.append("response_format", "json");
-  formData.append("file", new Blob([buffer], { type: mimetype || "audio/webm" }), filename || "recording.webm");
+  formData.append("file", new Blob([buffer], { type: cleanMime }), cleanFilename);
 
   const res = await fetch("https://api.openai.com/v1/audio/transcriptions", {
     method: "POST",
@@ -183,7 +212,7 @@ async function transcribeWithOpenAI(buffer, filename, mimetype, apiKey) {
 
   return {
     success: false,
-    message: json.error?.message || `OpenAI Whisper failed with status ${res.status}`,
+    message: json.error?.message || `OpenAI Whisper returned status ${res.status}`,
   };
 }
 
@@ -191,11 +220,12 @@ async function transcribeWithOpenAI(buffer, filename, mimetype, apiKey) {
  * Transcribe via Deepgram Nova-2 API
  */
 async function transcribeWithDeepgram(buffer, mimetype, apiKey) {
+  const cleanMime = (mimetype || "audio/webm").split(";")[0].trim();
   const res = await fetch("https://api.deepgram.com/v1/listen?model=nova-2&smart_format=true&language=en", {
     method: "POST",
     headers: {
       Authorization: `Token ${apiKey}`,
-      "Content-Type": mimetype || "audio/webm",
+      "Content-Type": cleanMime,
     },
     body: buffer,
   });
@@ -208,17 +238,8 @@ async function transcribeWithDeepgram(buffer, mimetype, apiKey) {
 
   return {
     success: false,
-    message: json.err_msg || `Deepgram failed with status ${res.status}`,
+    message: json.err_msg || `Deepgram returned status ${res.status}`,
   };
-}
-
-function cleanDisallowedChars(str) {
-  if (typeof str !== "string") return str;
-  return str
-    .replace(/[\u2014\u2015]/g, " - ")
-    .replace(/[\u2013]/g, "-")
-    .replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, "")
-    .replace(/[\u2600-\u27BF]/g, "");
 }
 
 module.exports = {

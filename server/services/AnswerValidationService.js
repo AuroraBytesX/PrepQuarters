@@ -1,9 +1,11 @@
 /*
  * Answer Validation Service
  * PrepQuarters Core Intelligence Engine
- * Validates candidate responses for relevance, coherence, and depth
- * before initiating neural evaluation.
+ * Validates candidate responses for basic sanity, coherence, and relevance
+ * before initiating deep neural evaluation.
  */
+
+const { cleanDisallowedChars } = require("./SanitizationHelper");
 
 const AUDIO_NOISE_PHRASES = [
   "you",
@@ -66,21 +68,21 @@ function validateCandidateAnswer({ questionText = "", topic = "", domain = "", q
   }
 
   // 1. Check for empty or extremely short answers
-  if (!cleanAnswer || cleanAnswer.length < 12) {
+  if (!cleanAnswer || cleanAnswer.length < 8) {
     return {
       isValid: false,
       category: "too_short",
-      reason: "Your answer was too brief (under 12 characters). An interview response requires a structured explanation.",
+      reason: "Your answer was too brief. An interview response requires structured technical reasoning.",
       retryPrompt: "Please explain your technical approach, core trade-offs, and design choices in greater detail.",
     };
   }
 
   const words = cleanAnswer.split(/\s+/).filter(Boolean);
-  if (words.length < 4) {
+  if (words.length < 3) {
     return {
       isValid: false,
       category: "insufficient_words",
-      reason: "Your answer provided fewer than 4 words, which is insufficient to evaluate technical competence.",
+      reason: "Your answer provided fewer than 3 words, which is insufficient to evaluate technical reasoning.",
       retryPrompt: "Please provide a complete explanation outlining how you would solve this scenario.",
     };
   }
@@ -91,7 +93,7 @@ function validateCandidateAnswer({ questionText = "", topic = "", domain = "", q
     return {
       isValid: false,
       category: "surrender_or_pass",
-      reason: "You indicated 'I don't know' or requested to pass. In an interview, walk through your problem-solving decomposition or state your assumptions even if you are uncertain of the final solution.",
+      reason: "You indicated 'I don't know' or requested to pass. In an interview, walk through your problem-solving decomposition or state your assumptions.",
       retryPrompt: "Please outline what foundational concepts or initial hypotheses you would explore for this question.",
     };
   }
@@ -113,17 +115,6 @@ function validateCandidateAnswer({ questionText = "", topic = "", domain = "", q
       category: "gibberish",
       reason: "The input contains repetitive or random character sequences that do not form coherent technical reasoning.",
       retryPrompt: "Please articulate a coherent technical solution to the question.",
-    };
-  }
-
-  // 5. Check for basic relevance to the question / topic / domain
-  const relevanceCheck = checkRelevance(cleanAnswer, questionText, topic, domain);
-  if (!relevanceCheck.isRelevant) {
-    return {
-      isValid: false,
-      category: "unrelated",
-      reason: relevanceCheck.reason || "The answer appears unrelated to the technical scenario presented.",
-      retryPrompt: `Please focus your answer specifically on addressing: "${questionText}"`,
     };
   }
 
@@ -153,7 +144,6 @@ function isSurrenderResponse(text) {
  * Detects keyboard mashing, repeated characters, or non-word entropy.
  */
 function isGibberishOrRepetitive(text) {
-  // Recognize valid code patterns (functions, variables, loops, classes)
   const lower = text.toLowerCase();
   if (
     lower.includes("function") ||
@@ -167,23 +157,34 @@ function isGibberishOrRepetitive(text) {
     return false;
   }
 
-  // Check repeated single character runs like 'aaaaaa' or 'ssssss' (excluding spaces/tabs/newlines)
-  if (/([^\s])\1{5,}/.test(text)) {
+  // Check repeated single character runs like 'aaaaaa' or 'ssssss'
+  if (/([^\s])\1{4,}/.test(text)) {
     return true;
   }
 
   // Check repeated word/token patterns like 'test test test test test'
   const words = text.toLowerCase().split(/\s+/).filter(Boolean);
-  if (words.length >= 4) {
+  if (words.length >= 3) {
     const uniqueWords = new Set(words);
     if (uniqueWords.size === 1) {
       return true;
     }
   }
 
+  // Check keyboard smash tokens (e.g. 'asldkfj', 'zxcvbnm', 'qwerty', vowelless words)
+  const smashWords = words.filter((w) => {
+    if (w.length >= 6 && !/[aeiouy]/i.test(w)) return true;
+    if (/(asdf|ghjk|zxcv|qwerty|lkjh|poiu)/i.test(w)) return true;
+    return false;
+  });
+
+  if (smashWords.length >= 2 || (words.length > 0 && smashWords.length / words.length >= 0.3)) {
+    return true;
+  }
+
   // Check character variety vs length
   const lettersOnly = text.replace(/[^a-zA-Z]/g, "");
-  if (lettersOnly.length > 20) {
+  if (lettersOnly.length > 15) {
     const uniqueChars = new Set(lettersOnly.toLowerCase());
     if (uniqueChars.size <= 3) {
       return true;
@@ -193,76 +194,8 @@ function isGibberishOrRepetitive(text) {
   return false;
 }
 
-/**
- * Checks whether the answer contains sufficient domain or general problem-solving vocabulary.
- */
-function checkRelevance(answer, questionText, topic, domain) {
-  const answerLower = answer.toLowerCase();
-  const qLower = (questionText + " " + topic + " " + domain).toLowerCase();
-
-  // Extract key terms from question and topic (words with length >= 4)
-  const qTerms = qLower
-    .replace(/[^a-z0-9\s]/g, " ")
-    .split(/\s+/)
-    .filter((w) => w.length >= 4 && !COMMON_STOP_WORDS.has(w));
-
-  // Common technical and analytical terms acceptable in any technical answer
-  const GENERAL_TECH_TERMS = [
-    "design", "system", "architecture", "data", "database", "cache", "caching", "server", "service",
-    "client", "api", "latency", "throughput", "scale", "scaling", "scalable", "storage", "query",
-    "table", "index", "load", "balancer", "traffic", "request", "response", "code", "algorithm",
-    "function", "component", "state", "user", "process", "memory", "cpu", "network", "async",
-    "sync", "model", "pipeline", "test", "testing", "metric", "deploy", "deployment", "monitor",
-    "monitoring", "error", "failure", "failover", "queue", "kafka", "redis", "sql", "nosql",
-    "cluster", "node", "partition", "shard", "lock", "thread", "concurrency", "rate", "limit",
-    "approach", "solution", "trade", "tradeoff", "implement", "structure", "framework", "lead",
-    "team", "stakeholder", "customer", "product", "feature", "ux", "ui", "interface", "cloud"
-  ];
-
-  let matches = 0;
-  qTerms.forEach((term) => {
-    if (answerLower.includes(term)) matches++;
-  });
-
-  let techTermMatches = 0;
-  GENERAL_TECH_TERMS.forEach((term) => {
-    if (answerLower.includes(term)) techTermMatches++;
-  });
-
-  // If answer has at least 1 term from the question or at least 1 standard technical/domain term, it is relevant
-  if (matches > 0 || techTermMatches > 0 || answer.split(/\s+/).length >= 15) {
-    return { isRelevant: true };
-  }
-
-  // If answer has zero technical terms and zero question terms in a short sentence, flag as potentially unrelated
-  return {
-    isRelevant: false,
-    reason: "Your response did not address the specific technical concepts or architecture referenced in the scenario.",
-  };
-}
-
-const COMMON_STOP_WORDS = new Set([
-  "what", "when", "where", "which", "while", "with", "about", "above", "after", "again", "against",
-  "all", "and", "any", "are", "because", "been", "before", "being", "below", "between", "both",
-  "but", "cannot", "could", "did", "does", "doing", "down", "during", "each", "few", "for",
-  "from", "further", "had", "has", "have", "having", "her", "here", "hers", "herself", "him",
-  "himself", "his", "how", "into", "its", "itself", "more", "most", "myself", "nor", "not",
-  "off", "once", "only", "other", "ought", "our", "ours", "ourselves", "out", "over", "own",
-  "same", "she", "should", "some", "such", "than", "that", "the", "their", "theirs", "them",
-  "themselves", "then", "there", "these", "they", "this", "those", "through", "too", "under",
-  "until", "very", "was", "were", "what", "when", "where", "which", "while", "who", "whom",
-  "why", "will", "would", "you", "your", "yours", "yourself", "yourselves"
-]);
-
-function cleanDisallowedChars(str) {
-  if (typeof str !== "string") return str;
-  return str
-    .replace(/[\u2014\u2015]/g, " - ")
-    .replace(/[\u2013]/g, "-")
-    .replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, "")
-    .replace(/[\u2600-\u27BF]/g, "");
-}
-
 module.exports = {
   validateCandidateAnswer,
+  isGibberishOrRepetitive,
+  isSurrenderResponse,
 };
