@@ -547,32 +547,24 @@ Question: "${currentQuestion.questionText}"
 Topic: "${currentQuestion.topic}"
 Expected Key Points: ${JSON.stringify(currentQuestion.expectedKeyPoints || [])}
 
-Interview History so far:
-${historySummary || "This is the first scenario."}
-
-CRITICAL TWO-TIER EVALUATION RULES:
-TIER 1: RELEVANCE & SANITY GATE:
-- Check if the answer actually addresses the question asked.
-- KEYWORD STUFFING: If the response is merely a list, dump, or dictionary of technical keywords without explanatory sentences or architectural reasoning, it is INVALID. Set "relevant": false, "technicallyMeaningful": false, and "score": 0.
-- If the answer is unrelated, fundamentally wrong, nonsensical, generic filler, or discusses a different topic:
+CRITICAL ZERO-SCORE & RIGOROUS TECHNICAL EVALUATION RULES (MANDATORY):
+TIER 1: RELEVANCE, REPETITION & TAUTOLOGY GATE:
+- QUESTION REPETITION / ECHO: If the candidate merely repeats, paraphrases, or echoes the question (e.g. saying "a hash map works by hashing keys and avoiding collisions"), or gives vague tautological statements without explaining CONCRETE MECHANISMS, you MUST set:
+  * "relevant": false
+  * "technicallyMeaningful": false
+  * "score": 0
+- AMBIGUOUS FLUFF / BUZZWORD DUMP: If the candidate uses confident-sounding words without explaining HOW things work internally or why they chose them, score MUST be 0 or 1.
+- If the answer is unrelated, fundamentally wrong, nonsensical, or generic filler:
   * set "relevant": false
-  * set "technicallyMeaningful": false
-  * set "score": 0
+  * "technicallyMeaningful": false
+  * "score": 0
 
-TIER 2: ACCURACY & SCORING:
-- ZERO SCORE RULE (MANDATORY): Unrelated, gibberish, empty, or keyword-stuffed text receives Score = 0. Word count or length must NEVER award marks.
-- INCOMPLETE ANSWERS (Capped at 3 to 5): If an answer is correct but brief/incomplete (only naming one basic concept while omitting distributed scale, failure modes, partitions, or trade-offs), you MUST cap the score between 3 and 5 (partial credit). NEVER award 7+ to a brief, incomplete single-sentence answer.
-- HIGH MARKS (7-10): Only for answers that explain architecture, trade-offs, and failure handling in depth.
-- For spoken voice transcripts with minor natural filler ("um", "like"), evaluate the underlying technical substance.
-
-DECISION ON NEXT QUESTION:
-- If follow-up probing is needed on index ${questionIndex + 1} of ${totalPlanned}, set "shouldAskFollowUp": true.
-- If generating next scenario, pick a completely different topic from [${alreadyAskedQuestionsList}] within ${domain}.
-
-Output valid JSON matching this schema (NO em dashes, NO emojis):
-{
-  "relevant": true,
-  "technicallyMeaningful": true,
+TIER 2: ACCURATE MERIT-BASED SCORING:
+- Score 0: Question repetition, paraphrase, gibberish, surrender, or ambiguous non-technical fluff.
+- Score 1-3: Superficial answer naming a concept but completely lacking depth, internal mechanics, or clarity.
+- Score 4-6: Basic correct explanation covering standard definitions, but missing edge cases, trade-offs, or complexity analysis.
+- Score 7-8: Strong, technically accurate explanation with concrete mechanics (e.g. bucket arrays, hash calculation, chaining/probing, load factor, O(1) avg / O(n) worst case).
+- Score 9-10: Flawless, staff-level answer with deep internal mechanics, memory layout, trade-offs, and edge case mitigation. NEVER give 9 or 10 to short or ambiguous answers!
   "evaluation": {
     "score": 8,
     "technicalAccuracy": "Detailed analysis of technical correctness and depth",

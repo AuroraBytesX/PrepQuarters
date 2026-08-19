@@ -209,6 +209,13 @@ router.post("/forgot-password", authLimiter, async (req, res) => {
 
     const result = await createPasswordResetToken(cleanEmail);
 
+    if (!result.success) {
+      return res.status(500).json({
+        success: false,
+        message: result.message || "Could not deliver the reset code. Please try again.",
+      });
+    }
+
     res.json({
       success: true,
       message: result.message || "A 6-digit password reset verification code has been dispatched to your email address.",

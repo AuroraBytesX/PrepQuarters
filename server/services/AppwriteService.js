@@ -261,8 +261,18 @@ async function createPasswordResetToken(email) {
 
   console.log(`[PASSWORD_RESET_DISPATCH] 6-Digit code generated for ${cleanEmail}. Email dispatched: ${emailResult.delivered}`);
 
+  if (!emailResult.delivered) {
+    return {
+      success: false,
+      delivered: false,
+      error: emailResult.error || "Email delivery failed.",
+      message: `Could not deliver verification email (${emailResult.error || "Connection timeout"}). Please configure RESEND_API_KEY on your server.`,
+    };
+  }
+
   return {
     success: true,
+    delivered: true,
     email: cleanEmail,
     message: "A 6-digit password reset verification code has been sent to your email. Please enter it below.",
   };

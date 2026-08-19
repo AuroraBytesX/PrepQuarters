@@ -134,23 +134,36 @@ function validateCandidateAnswer({ questionText = "", topic = "", domain = "", q
 }
 
 /**
- * Detects whether candidate answer merely echoes or repeats the question.
+ * Detects whether candidate answer merely echoes or repeats the question without substantive technical novelty.
  */
 function isQuestionEchoOrRepetition(answer, question) {
   if (!answer || !question) return false;
 
-  const stopWords = new Set(["the", "and", "a", "an", "in", "on", "of", "to", "for", "is", "are", "how", "what", "would", "you", "design", "system", "describe", "explain"]);
+  const stopWords = new Set([
+    "the", "and", "a", "an", "in", "on", "of", "to", "for", "is", "are", "was", "were",
+    "how", "what", "would", "you", "design", "system", "describe", "explain", "that", "this",
+    "with", "it", "they", "we", "i", "my", "your", "by", "as", "at", "from", "when", "if",
+    "during", "happens", "works", "internally", "handled", "handling", "handles", "about",
+    "into", "tell", "give", "can", "could", "should", "will", "so", "like", "such"
+  ]);
+
   const wordsA = answer.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter((w) => w.length > 2 && !stopWords.has(w));
   const wordsQ = question.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter((w) => w.length > 2 && !stopWords.has(w));
 
-  if (wordsA.length < 3 || wordsQ.length < 3) return false;
+  if (wordsA.length < 2 || wordsQ.length < 2) return false;
 
   const setQ = new Set(wordsQ);
   const matchedWords = wordsA.filter((w) => setQ.has(w));
+  const novelWords = wordsA.filter((w) => !setQ.has(w));
   const overlapRatio = matchedWords.length / wordsA.length;
 
-  // If over 65% of candidate's keywords are directly copied from the question and answer is short
-  if (overlapRatio >= 0.65 && wordsA.length <= wordsQ.length * 1.5) {
+  // If over 45% of content words are from the question and fewer than 4 novel technical words exist
+  if (overlapRatio >= 0.45 && novelWords.length < 5) {
+    return true;
+  }
+
+  // If answer is purely an echo phrase like "To explain how a hash map works internally..."
+  if (overlapRatio >= 0.70) {
     return true;
   }
 
