@@ -1,6 +1,6 @@
 # PrepQuarters
 
-> ** AI Interview Cockpit & Technical Career Engineering Platform**  
+>  AI Interview Cockpit & Technical Career Engineering Platform 
 > Real-time adaptive technical assessments, real-time code execution, conversational LaTeX resume studio, and multi-provider AI evaluation.
 
 ---
